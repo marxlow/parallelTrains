@@ -250,10 +250,10 @@ void get_longest_shortest_average_waiting_time(int green_station_waiting_times[]
                                         int *longest_average_waiting_time, int *shortest_average_waiting_time) {
     int i;
     for (i = 0; i < num_green_stations; i++) {
-        if (*longest_average_waiting_time < double(green_station_waiting_times[i]) / double(N)) {
+        if (*longest_average_waiting_time < (double(green_station_waiting_times[i]) / double(N))) {
             *longest_average_waiting_time = double(green_station_waiting_times[i]) / double(N);
         }
-        if (*shortest_average_waiting_time > double(green_station_waiting_times[i] / double(N))) {
+        if (*shortest_average_waiting_time > (double(green_station_waiting_times[i] / double(N)))) {
             *shortest_average_waiting_time = double(green_station_waiting_times[i] / double(N));
         }
     }
