@@ -148,18 +148,23 @@ int main(int argc, char *argv[])
                     } else if (green_trains[i].loading_time == FINISHED_LOADING) {
                         // Check if train can move into link.
                         int link_index = get_next_link(station, direction, m, green_stations, L);
-                        #pragma omp critical
-                        // The link is currently occupied, wait in the station.
-                        if (link[link_index] >= 0) {
-                            continue;
-                        } 
-                        // Link unoccupied, move train onto link
-                        link[link_index] = i;
+                        #pragma omp critical 
+                        {
+                            // The link is currently occupied, wait in the station.
+                            if (link[link_index] >= 0) {
+                                continue;
+                            }
+                            // Link unoccupied, move train onto link
+                            #pragma omp atomic 
+                            {
+                                link[link_index] = i;
+                            }
+                        }
                         green_trains[i].status = IN_TRANSIT;
                         green_trains[i].transit_time = get_transit_time();
                         green_trains[i].loading_time = WAITING_TO_LOAD;
                     } else if (green_trains[i].loading_time == WAITING_TO_LOAD) {
-                        // Seeing if this train can start loading
+                        // This train can start loading.
                         if (green_stations[green_trains[i].station] == READY_TO_LOAD) {
                             green_trains[i].loading_time = calculate_loadtime - 1;
                             green_stations[green_trains[i].station] = i;
@@ -167,12 +172,17 @@ int main(int argc, char *argv[])
                     }
                 } else if (green_trains[i].status == IN_TRANSIT) {
                     if (green_trains[i].transit_time == 0) {
-                        // Move the train to the station
+                        // Move the train from the link to the station
+                        int link_index = get_next_link(station, direction, m, green_stations);
+                        #pragma omp atomic 
+                        {
+                            link[link_index] = i;
+                        }
                         int next_station = get_next_station(green_trains[i].station, green_trains[i].direction);
                         green_trains[i].station = nextStation;
                         green_stations[next_station] = 1;
                     } else {
-                        green_trains[i].transit_time -= 1;
+                        green_trains[i].transit_time--;
                     }
                 }
             }
