@@ -246,6 +246,7 @@ void print_status(struct train_type green_trains[], int num_green_trains) {
     for (i = 0; i < num_green_trains; i++) {
         if (green_trains[i].status == IN_STATION) {
             printf("Train %d is currently in station %d\n", i, green_trains[i].station);
+            printf("Loading time of train = %d\n", green_trains[i].loading_time);
         } else if (green_trains[i].status == IN_TRANSIT) {
             printf("Train %d is currently in transit.\n", i);
         }
