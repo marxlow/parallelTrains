@@ -23,7 +23,7 @@
 // Station status
 #define READY_TO_LOAD -1
 #define UNVISITED -2
-
+#define LOADING 0
 
 // Loading status
 #define WAITING_TO_LOAD -1
@@ -36,19 +36,19 @@ struct train_type
     int direction;      // 1 for up  | 0 for down
     int station;        // -1 for not in any station | > 0 for index of station it is in
     int transit_time;   // -1 for NA | > 0 for in transit
-}
+};
 
-typedef struct station_name
+typedef struct station_names
 {
     char name[20];
-} name;
+} station_name;
 
 
 int main(int argc, char *argv[]) 
 {
     // NOTE: Hardcoded values from sample input
-    int S = 10;                 // Number of train stations in the network
-    station_name all_stations_list[S] = {       // List of stations
+    int S = 8;                 // Number of train stations in the network
+    const char *all_stations_list[] = {       // List of stations
         "changi",
         "tampines",
         "clementi",
@@ -70,36 +70,36 @@ int main(int argc, char *argv[])
     };                          
     double all_stations_popularity_list[S] = {
         0.9, 0.5, 0.2, 0.3, 0.7, 0.8, 0.4, 0.1
-    }
-    station_name G[4] = {       // Stations in the green line
+    };
+    const char *G[] = {       // Stations in the green line
         "tuas",
         "clementi",
         "tampines",
         "changi"
     };
-    station_name Y[5] = {       // Stations in the yellow line
+    const char *Y[] = {       // Stations in the yellow line
         "bedok",
         "chinatown",
         "clementi",
         "tampines",
         "harborfront"
     };
-    station_name B[4] = {       // Stations in the blue line
+    const char *B[] = {       // Stations in the blue line
         "changi",
         "tampines",
         "downtown",
         "harborfront"
     };
-    int N = 10                  // Number of time ticks in the simulation (Iterations)
-    int g = 4                  // Number of trains in green line
-    int y = 10                  // Number of trains in yellow line
-    int b = 10                  // Number of trains in blue line
+    int N = 10;                  // Number of time ticks in the simulation (Iterations)
+    int g = 4;                  // Number of trains in green line
+    int y = 10;                  // Number of trains in yellow line
+    int b = 10;                  // Number of trains in blue line
 
 
     // TODO: Initialization step. Have to find some way to initialise this programmatically.
     // 2D matrix to store the status of each link.
     // value -1 : link is empty | 1 A train is on the link
-    int links_status[S][S]; 
+    int links_status[S][S];
     int i;
     int j;
     for (i = 0; i < S; i++) {
@@ -108,8 +108,7 @@ int main(int argc, char *argv[])
         }
     }
 
-
-    train_type green_trains[g] = {
+    struct train_type green_trains[g] = {
         {0, -1, -1, -1, -1},
         {0, -1, -1, -1, -1},
         {0, -1, -1, -1, -1},
@@ -120,7 +119,7 @@ int main(int argc, char *argv[])
     // -2 : unvisited
     // -1 : not loading
     // >= 0: index of loading train
-    int num_green_stations = 4
+    int num_green_stations = 4;
     int green_stations[num_green_stations] = {UNVISITED, UNVISITED, UNVISITED, UNVISITED};
     int green_station_waiting_times[num_green_stations];
     for (i = 0 ; i < num_green_stations; i++) {
@@ -136,7 +135,7 @@ int main(int argc, char *argv[])
         // Boolean value to make sure that only 1 train enters the line at any time tick.
         int introduced_train = 0;
 
-        #pragma omp parallel shared(introduced_train) private(i)
+        #pragma omp parallel shared(introduced_train, green_stations) private(i)
         {
             // This iteration is going through all the trains in green line.
             // As i is private, each train is handled by a single thread.
@@ -151,9 +150,9 @@ int main(int argc, char *argv[])
                             introduced_train = 1;
                             green_trains[i].status = IN_STATION;
                             green_trains[i].station = starting_station;
-                            if (green_stations[starting_station] == NO_TRAINS) {
-                                green_stations[starting_station] = i;
-                                // TODO: Get loading time of a train with a random function.
+                            // If no trains are loading. We will start loading the introduced train immediately.
+                            if (green_stations[starting_station] == READY_TO_LOAD) {
+                                green_stations[starting_station] = LOADING;
                                 int current_all_station_index = get_all_station_index(starting_station, G, all_stations_list);
                                 green_trains[i].loading_time = calculate_loadtime(all_stations_popularity_list[current_all_station_index]) - 1;
                             }
