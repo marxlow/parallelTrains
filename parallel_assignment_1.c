@@ -73,20 +73,20 @@ int main(int argc, char *argv[])
     double all_stations_popularity_list[8] = {
         0.9, 0.5, 0.2, 0.3, 0.7, 0.8, 0.4, 0.1
     };
-    const char *G[] = {       // Stations in the green line
+    char *G[] = {       // Stations in the green line
         "tuas",
         "clementi",
         "tampines",
         "changi"
     };
-    const char *Y[] = {       // Stations in the yellow line
+    char *Y[] = {       // Stations in the yellow line
         "bedok",
         "chinatown",
         "clementi",
         "tampines",
         "harborfront"
     };
-    const char *B[] = {       // Stations in the blue line
+    char *B[] = {       // Stations in the blue line
         "changi",
         "tampines",
         "downtown",
@@ -193,7 +193,7 @@ int main(int argc, char *argv[])
                     } else if (green_trains[i].loading_time == WAITING_TO_LOAD) {
                         // This train can start loading.
                         if (green_stations[green_trains[i].station] == READY_TO_LOAD) {
-                            index_of_station = get_all_station_index(i, green_stations, all_stations_list, )
+                            //index_of_station = get_all_station_index(i, green_stations, all_stations_list, )
                             green_trains[i].loading_time = calculate_loadtime(all_stations_popularity_list[2]) - 1;
                             green_stations[green_trains[i].station] = i;
                         }
@@ -245,9 +245,7 @@ int main(int argc, char *argv[])
     get_longest_shortest_average_waiting_time(green_station_waiting_times, num_green_stations, N, &longest_average_waiting_time, &shortest_average_waiting_time);
 }
 
-void get_longest_shortest_average_waiting_time(int green_stg50
-ation_waiting_times[], int num_green_stations, int N, 
-                                        int *longest_average_waiting_time, int *shortest_average_waiting_time) {
+void get_longest_shortest_average_waiting_time(int green_station_waiting_times[], int num_green_stations, int N, int *longest_average_waiting_time, int *shortest_average_waiting_time) {
     int i;
     for (i = 0; i < num_green_stations; i++) {
         if (*longest_average_waiting_time < (double)green_station_waiting_times[i] / (double)N) {
