@@ -172,16 +172,16 @@ int main(int argc, char *argv[])
                         #pragma omp critical
                         {
                             // The link is currently occupied, wait in the station.
-                            if (links_status[current_all_station_index][next_all_station_index] == LINK_IS_USED ) {
-                                continue;
+                            if (links_status[current_all_station_index][next_all_station_index] == LINK_IS_EMPTY ) {
+                                // Link unoccupied, move train to the link
+                                green_trains[i].transit_time = link_transit_time[current_all_station_index][next_all_station_index] - 1;
+                                green_trains[i].status = IN_TRANSIT;
+                                green_trains[i].loading_time = WAITING_TO_LOAD;
+                                // Empty up station
+                                green_stations[current_station] = READY_TO_LOAD;
+                                links_status[current_all_station_index][next_all_station_index] = LINK_IS_USED;
                             } 
-                            // Link unoccupied, move train to the link
-                            green_trains[i].transit_time = link_transit_time[current_all_station_index][next_all_station_index] - 1;
-                            green_trains[i].status = IN_TRANSIT;
-                            green_trains[i].loading_time = WAITING_TO_LOAD;
-                            // Empty up station
-                            green_stations[current_station] = READY_TO_LOAD;
-                            links_status[current_all_station_index][next_all_station_index] = LINK_IS_USED;
+
                         }
                     } else if (green_trains[i].loading_time == WAITING_TO_LOAD) {
                         // This train can start loading.
