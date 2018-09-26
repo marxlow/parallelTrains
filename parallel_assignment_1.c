@@ -4,6 +4,7 @@
 #include <omp.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include <string.h>
 #include <limits.h>
 #include <math.h>
 
@@ -42,10 +43,8 @@ void get_longest_shortest_average_waiting_time(int green_station_waiting_times[]
 double get_average_waiting_time(int green_station_waiting_times[], int num_green_stations, int N);
 int get_next_station(int prev_station, int direction, int num_stations);
 void free_link(int current_situation, int next_station, char *line_stations[], char *all_stations_list[], int **links_status);
-int get_all_station_index(int line_station_index, char *line_stations[], char  *all_stations_list[]);
+int get_all_station_index(int line_station_index, char *line_stations[], char *all_stations_list[]);
 int calculate_loadtime(double popularity);
-
-s
 
 int main(int argc, char *argv[]) 
 {
@@ -246,15 +245,16 @@ int main(int argc, char *argv[])
     get_longest_shortest_average_waiting_time(green_station_waiting_times, num_green_stations, N, &longest_average_waiting_time, &shortest_average_waiting_time);
 }
 
-void get_longest_shortest_average_waiting_time(int green_station_waiting_times[], int num_green_stations, int N, 
+void get_longest_shortest_average_waiting_time(int green_stg50
+ation_waiting_times[], int num_green_stations, int N, 
                                         int *longest_average_waiting_time, int *shortest_average_waiting_time) {
     int i;
     for (i = 0; i < num_green_stations; i++) {
-        if (*longest_average_waiting_time < (double(green_station_waiting_times[i]) / double(N))) {
-            *longest_average_waiting_time = double(green_station_waiting_times[i]) / double(N);
+        if (*longest_average_waiting_time < (double)green_station_waiting_times[i] / (double)N) {
+            *longest_average_waiting_time = (double)green_station_waiting_times[i] / (double)N;
         }
-        if (*shortest_average_waiting_time > (double(green_station_waiting_times[i] / double(N)))) {
-            *shortest_average_waiting_time = double(green_station_waiting_times[i] / double(N));
+        if (*shortest_average_waiting_time > (double)green_station_waiting_times[i] / (double)N) {
+            *shortest_average_waiting_time = (double)green_station_waiting_times[i] / (double)N);
         }
     }
 }
@@ -266,8 +266,8 @@ double get_average_waiting_time(int green_station_waiting_times[], int num_green
         total_waiting_time += green_station_waiting_times[i];
     }
     double average_waiting_time;
-    average_waiting_time = double(total_waiting_time) / double(num_green_stations);
-    average_waiting_time = average_waiting_time / double(N);
+    average_waiting_time = (double)total_waiting_time / (double)num_green_stations;
+    average_waiting_time = average_waiting_time / (double)N;
     return average_waiting_time;
 }
 
@@ -289,20 +289,19 @@ int get_next_station(int prev_station, int direction, int num_stations)  {
 }
 
 // Frees up the link
-void free_link(int current_station, int next_station, char *line_stations[], char *all_stations_list[], int links_status[][]) {
+void free_link(int current_station, int next_station, char *line_stations[], char *all_stations_list[], int **links_status) {
     int current_all_station_index = get_all_station_index(current_station, line_stations, all_stations_list);
     int next_all_station_index = get_all_station_index(next_station, line_stations, all_stations_list);
     #pragma omp atomic 
-    {
-        links_status[current_all_station_index][next_all_station_index] = LINK_IS_EMPTY;
-    }
+    links_status[current_all_station_index][next_all_station_index] = LINK_IS_EMPTY;
 }
 
 // Returns the index of a station in the "all_station_list"
 // index: all_station_list index
 int get_all_station_index(int line_station_index, char *line_stations[], char *all_stations_list[]) {
     char name = line_stations[line_station_index];
-    for (int i = 0; i < sizeof(all_stations_list); i ++) {
+    // TODO: HARDCODED value of number of stations
+    for (int i = 0; i < 8; i ++) {
         if (strcmp(name, all_stations_list[i]) == 1) { // returns 1 if there is a match.
             return i;
         }
