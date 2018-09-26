@@ -39,7 +39,7 @@ struct train_type
     int transit_time;   // -1 for NA | > 0 for in transit
 };
 
-void get_longest_shortest_average_waiting_time(int green_station_waiting_times[], int num_green_stations, int N, int *longest_average_waiting_time, int *shortest_average_waiting_time);
+void get_longest_shortest_average_waiting_time(int green_station_waiting_times[], int num_green_stations, int N, double *longest_average_waiting_time, double *shortest_average_waiting_time);
 double get_average_waiting_time(int green_station_waiting_times[], int num_green_stations, int N);
 int get_next_station(int prev_station, int direction, int num_stations);
 void free_link(int current_situation, int next_station, char *line_stations[], char *all_stations_list[], int **links_status);
@@ -50,7 +50,7 @@ int main(int argc, char *argv[])
 {
     // NOTE: Hardcoded values from sample input
     int S = 8;                 // Number of train stations in the network
-    const char *all_stations_list[] = {       // List of stations
+    char *all_stations_list[] = {       // List of stations
         "changi",
         "tampines",
         "clementi",
@@ -186,9 +186,7 @@ int main(int argc, char *argv[])
                             // Empty up station
                             green_stations[current_station] = READY_TO_LOAD;
                             #pragma omp atomic
-                            {
                                 links_status[current_all_station_index][next_all_station_index] = LINK_IS_USED;
-                            }
                         }
                     } else if (green_trains[i].loading_time == WAITING_TO_LOAD) {
                         // This train can start loading.
@@ -245,7 +243,7 @@ int main(int argc, char *argv[])
     get_longest_shortest_average_waiting_time(green_station_waiting_times, num_green_stations, N, &longest_average_waiting_time, &shortest_average_waiting_time);
 }
 
-void get_longest_shortest_average_waiting_time(int green_station_waiting_times[], int num_green_stations, int N, int *longest_average_waiting_time, int *shortest_average_waiting_time) {
+void get_longest_shortest_average_waiting_time(int green_station_waiting_times[], int num_green_stations, int N, double *longest_average_waiting_time, double *shortest_average_waiting_time) {
     int i;
     for (i = 0; i < num_green_stations; i++) {
         if (*longest_average_waiting_time < (double)green_station_waiting_times[i] / (double)N) {
@@ -291,7 +289,7 @@ void free_link(int current_station, int next_station, char *line_stations[], cha
     int current_all_station_index = get_all_station_index(current_station, line_stations, all_stations_list);
     int next_all_station_index = get_all_station_index(next_station, line_stations, all_stations_list);
     #pragma omp atomic 
-    links_status[current_all_station_index][next_all_station_index] = LINK_IS_EMPTY;
+        links_status[current_all_station_index][next_all_station_index] = LINK_IS_EMPTY;
 }
 
 // Returns the index of a station in the "all_station_list"
