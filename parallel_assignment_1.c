@@ -29,14 +29,6 @@
 #define WAITING_TO_LOAD -1
 #define FINISHED_LOADING 0
 
-
-void get_longest_shortest_average_waiting_time(int green_station_waiting_times[], int num_green_stations, int N, int *longest_average_waiting_time, int *shortest_average_waiting_time);
-double get_average_waiting_time(int green_station_waiting_times[], int num_green_stations, int N);
-int get_next_station(int prev_station, int direction, int num_stations);
-void free_link(int current_situation, int next_station, struct station_name line_stations[], struct station_name all_stations_list[], int **links_status);
-int get_all_station_index(int line_station_index, struct station_name line_stations[], struct station_name all_stations_list[]);
-int calculate_loadtime(double popularity);
-
 struct train_type
 {
     int loading_time;   // -1 waiting to load | 0 has loaded finish at the station| > 0 for currently loading
@@ -46,11 +38,14 @@ struct train_type
     int transit_time;   // -1 for NA | > 0 for in transit
 };
 
-typedef struct station_names
-{
-    char name[20];
-} station_name;
+void get_longest_shortest_average_waiting_time(int green_station_waiting_times[], int num_green_stations, int N, int *longest_average_waiting_time, int *shortest_average_waiting_time);
+double get_average_waiting_time(int green_station_waiting_times[], int num_green_stations, int N);
+int get_next_station(int prev_station, int direction, int num_stations);
+void free_link(int current_situation, int next_station, char *line_stations[], char *all_stations_list[], int **links_status);
+int get_all_station_index(int line_station_index, char *line_stations[], char  *all_stations_list[]);
+int calculate_loadtime(double popularity);
 
+s
 
 int main(int argc, char *argv[]) 
 {
@@ -151,26 +146,26 @@ int main(int argc, char *argv[])
                 if (green_trains[i].status == NOT_IN_NETWORK) {
                     #pragma omp critical
                     {
-                        if (introduced_train == 0) {
-                            // TODO: starting station should alternate between ends of a line
-                            int starting_station = 0;
-                            // Introduce the train to the network and update.
-                            introduced_train = 1;
-                            green_trains[i].status = IN_STATION;
-                            green_trains[i].station = starting_station;
-                            // If no trains are loading. We will start loading the introduced train immediately.
-                            if (green_stations[starting_station] == READY_TO_LOAD) {
-                                green_stations[starting_station] = LOADING;
-                                int current_all_station_index = get_all_station_index(starting_station, G, all_stations_list);
-                                green_trains[i].loading_time = calculate_loadtime(all_stations_popularity_list[current_all_station_index]) - 1;
-                            }
+                    if (introduced_train == 0) {
+                        // TODO: starting station should alternate between ends of a line
+                        int starting_station = 0;
+                        // Introduce the train to the network and update.
+                        introduced_train = 1;
+                        green_trains[i].status = IN_STATION;
+                        green_trains[i].station = starting_station;
+                        // If no trains are loading. We will start loading the introduced train immediately.
+                        if (green_stations[starting_station] == READY_TO_LOAD) {
+                            green_stations[starting_station] = LOADING;
+                            int current_all_station_index = get_all_station_index(starting_station, G, all_stations_list);
+                            green_trains[i].loading_time = calculate_loadtime(all_stations_popularity_list[current_all_station_index]) - 1;
                         }
-                    }
-                    else {
+                    } else {
                         // A train as already entered the line. As only one train is 
                         // allowed into the line in any time tick, we will skip this.
                         continue;
                     }
+                    }
+
                 } else if (green_trains[i].status == IN_STATION) {
                     if (green_trains[i].loading_time > 0) {
                         green_trains[i].loading_time--;
@@ -199,7 +194,8 @@ int main(int argc, char *argv[])
                     } else if (green_trains[i].loading_time == WAITING_TO_LOAD) {
                         // This train can start loading.
                         if (green_stations[green_trains[i].station] == READY_TO_LOAD) {
-                            green_trains[i].loading_time = calculate_loadtime - 1;
+                            index_of_station = get_all_station_index(i, green_stations, all_stations_list, )
+                            green_trains[i].loading_time = calculate_loadtime(all_stations_popularity_list[2]) - 1;
                             green_stations[green_trains[i].station] = i;
                         }
                     }
@@ -216,7 +212,7 @@ int main(int argc, char *argv[])
                             next_direction = LEFT;
                         }
                         // Free up the link the train was on.
-                        free_link(current_station, next_station, G, all_stations_list, links_status)
+                        free_link(current_station, next_station, G, all_stations_list, links_status);
                         // Update Train
                         green_trains[i].station = next_station;
                         green_trains[i].direction = next_direction;
@@ -293,7 +289,7 @@ int get_next_station(int prev_station, int direction, int num_stations)  {
 }
 
 // Frees up the link
-void free_link(int current_station, int next_station, struct station_name line_stations[], struct station_name all_stations_list[], int links_status[][]) {
+void free_link(int current_station, int next_station, char *line_stations[], char *all_stations_list[], int links_status[][]) {
     int current_all_station_index = get_all_station_index(current_station, line_stations, all_stations_list);
     int next_all_station_index = get_all_station_index(next_station, line_stations, all_stations_list);
     #pragma omp atomic 
@@ -304,7 +300,7 @@ void free_link(int current_station, int next_station, struct station_name line_s
 
 // Returns the index of a station in the "all_station_list"
 // index: all_station_list index
-int get_all_station_index(int line_station_index, struct station_name line_stations[], struct station_name all_stations_list[]) {
+int get_all_station_index(int line_station_index, char *line_stations[], char *all_stations_list[]) {
     char name = line_stations[line_station_index];
     for (int i = 0; i < sizeof(all_stations_list); i ++) {
         if (strcmp(name, all_stations_list[i]) == 1) { // returns 1 if there is a match.
