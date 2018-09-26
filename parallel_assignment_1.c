@@ -101,7 +101,7 @@ int main(int argc, char *argv[])
     // TODO: Initialization step. Have to find some way to initialise this programmatically.
     // 2D matrix to store the status of each link.
     // value -1 : link is empty | 1 A train is on the link
-    int links_status[8][8];
+    int links_status[][];
     int i;
     int j;
     for (i = 0; i < 8; i++) {
@@ -185,8 +185,7 @@ int main(int argc, char *argv[])
                             green_trains[i].loading_time = WAITING_TO_LOAD;
                             // Empty up station
                             green_stations[current_station] = READY_TO_LOAD;
-                            #pragma omp atomic
-                                links_status[current_all_station_index][next_all_station_index] = LINK_IS_USED;
+                            links_status[current_all_station_index][next_all_station_index] = LINK_IS_USED;
                         }
                     } else if (green_trains[i].loading_time == WAITING_TO_LOAD) {
                         // This train can start loading.
@@ -250,7 +249,7 @@ void get_longest_shortest_average_waiting_time(int green_station_waiting_times[]
             *longest_average_waiting_time = (double)green_station_waiting_times[i] / (double)N;
         }
         if (*shortest_average_waiting_time > (double)green_station_waiting_times[i] / (double)N) {
-            *shortest_average_waiting_time = (double)green_station_waiting_times[i] / (double)N);
+            *shortest_average_waiting_time = (double)green_station_waiting_times[i] / (double)N;
         }
     }
 }
@@ -288,17 +287,16 @@ int get_next_station(int prev_station, int direction, int num_stations)  {
 void free_link(int current_station, int next_station, char *line_stations[], char *all_stations_list[], int **links_status) {
     int current_all_station_index = get_all_station_index(current_station, line_stations, all_stations_list);
     int next_all_station_index = get_all_station_index(next_station, line_stations, all_stations_list);
-    #pragma omp atomic 
-        links_status[current_all_station_index][next_all_station_index] = LINK_IS_EMPTY;
+    links_status[current_all_station_index][next_all_station_index] = LINK_IS_EMPTY;
 }
 
 // Returns the index of a station in the "all_station_list"
 // index: all_station_list index
 int get_all_station_index(int line_station_index, char *line_stations[], char *all_stations_list[]) {
-    char name = line_stations[line_station_index];
+    char *name = line_stations[line_station_index];
     // TODO: HARDCODED value of number of stations
     for (int i = 0; i < 8; i ++) {
-        if (strcmp(name, all_stations_list[i]) == 1) { // returns 1 if there is a match.
+        if (strcmp(*name, all_stations_list[i]) == 1) { // returns 1 if there is a match.
             return i;
         }
     }
