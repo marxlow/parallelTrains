@@ -96,10 +96,17 @@ int main(int argc, char *argv[])
         {0, -1, -1, -1, -1}
     };
 
+    // TODO: Programmatically find the number of stations in the green line.
     // -2 : unvisited
     // -1 : not loading
     // >= 0: index of loading train
-    int green_stations[4] = { -2, -2, -2, -2 };
+    int num_green_stations = 4
+    int green_stations[num_green_stations] = { -2, -2, -2, -2 };
+    int green_station_waiting_times[4];
+    int i;
+    for (i = 0 ; i < num_green_stations; i++) {
+        green_station_waiting_times[i] = 0;
+    }
 
     // Set the number of threads to be = number of trains
     omp_set_num_threads(g);
@@ -110,8 +117,6 @@ int main(int argc, char *argv[])
         int i;
         // Boolean value to make sure that only 1 train enters the line at any time tick.
         int introduced_train = 0;
-
-        // Go through stations array, move all the 
 
         #pragma omp parallel shared(introduced_train) private(i)
         {
@@ -171,13 +176,22 @@ int main(int argc, char *argv[])
                     }
                 }
             }
-            // Master thread consolidation:
-            // Step 1: 
-            // Go through all the stations, calculate the number of stations that are currently -1. Count them as waiting.  
-            // Step 2: 
-            // Go through all the stations, for every station that has a index (there is a train that was loading), check that train to see if loading time is > 0.
-            // if loading time == 0, we make station[train index] = WAITING_TO_LOAD
-
+        }
+        // Master thread consolidation:
+        int i;
+        // Count the waiting times at each station.
+        for (i = 0 ; i < num_green_stations; i++) {
+            if (green_stations[i] == READY_TO_LOAD) {
+                green_station_waiting_times[i]++;
+            } 
+        }
+        // Clean up stations where the loading train has just finished loading up passengers.
+        for (i = 0 ; i < num_green_stations; i++) {
+            if (green_stations[i] >= 0) {
+                if (green_trains[green_stations[i]].loading_time == 0) {
+                    green_stations[i] == WAITING_TO_LOAD;
+                }
+            }
         }
     }
 }
