@@ -231,7 +231,7 @@ int main(int argc, char *argv[])
                 }
             }
         }
-        printf("Current time tick = %d", time_tick);
+        printf("Current time tick = %d\n", time_tick);
         print_status(green_trains, g);
     }
     
@@ -245,9 +245,9 @@ void print_status(struct train_type green_trains[], int num_green_trains) {
     int i;
     for (i = 0; i < num_green_trains; i++) {
         if (green_trains[i].status == IN_STATION) {
-            printf("Train %d is currently in station %d", i, green_trains[i].station);
+            printf("Train %d is currently in station %d\n", i, green_trains[i].station);
         } else if (green_trains[i].status == IN_TRANSIT) {
-            printf("Train %d is currently in transit.", i);
+            printf("Train %d is currently in transit.\n", i);
         }
     }   
 }
