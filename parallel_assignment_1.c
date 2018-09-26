@@ -1,6 +1,7 @@
 #include <omp.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include <limits.h>
 #define IN_TRANSIT 1
 #define IN_STATION 0
 #define NOT_IN_NETWORK -1
@@ -148,18 +149,23 @@ int main(int argc, char *argv[])
                     } else if (green_trains[i].loading_time == FINISHED_LOADING) {
                         // Check if train can move into link.
                         int link_index = get_next_link(station, direction, m, green_stations, L);
-                        #pragma omp critical
-                        // The link is currently occupied, wait in the station.
-                        if (link[link_index] >= 0) {
-                            continue;
-                        } 
-                        // Link unoccupied, move train onto link
-                        link[link_index] = i;
+                        #pragma omp critical 
+                        {
+                            // The link is currently occupied, wait in the station.
+                            if (link[link_index] >= 0) {
+                                continue;
+                            }
+                            // Link unoccupied, move train onto link
+                            #pragma omp atomic 
+                            {
+                                link[link_index] = i;
+                            }
+                        }
                         green_trains[i].status = IN_TRANSIT;
                         green_trains[i].transit_time = get_transit_time();
                         green_trains[i].loading_time = WAITING_TO_LOAD;
                     } else if (green_trains[i].loading_time == WAITING_TO_LOAD) {
-                        // Seeing if this train can start loading
+                        // This train can start loading.
                         if (green_stations[green_trains[i].station] == READY_TO_LOAD) {
                             green_trains[i].loading_time = calculate_loadtime - 1;
                             green_stations[green_trains[i].station] = i;
@@ -167,12 +173,17 @@ int main(int argc, char *argv[])
                     }
                 } else if (green_trains[i].status == IN_TRANSIT) {
                     if (green_trains[i].transit_time == 0) {
-                        // Move the train to the station
+                        // Move the train from the link to the station
+                        int link_index = get_next_link(station, direction, m, green_stations);
+                        #pragma omp atomic 
+                        {
+                            link[link_index] = i;
+                        }
                         int next_station = get_next_station(green_trains[i].station, green_trains[i].direction);
                         green_trains[i].station = nextStation;
                         green_stations[next_station] = 1;
                     } else {
-                        green_trains[i].transit_time -= 1;
+                        green_trains[i].transit_time--;
                     }
                 }
             }
@@ -194,6 +205,35 @@ int main(int argc, char *argv[])
             }
         }
     }
+    double average_waiting_time = get_average_waiting_time(green_station_waiting_times, num_green_stations, N);
+    double longest_average_waiting_time = 0;
+    double shortest_average_waiting_time = INT_MAX;
+    get_longest_shortest_average_waiting_time(green_station_waiting_times, num_green_stations, N, &longest_average_waiting_time, &shortest_average_waiting_time);
+}
+
+void get_longest_shortest_average_waiting_time(int green_station_waiting_times[], int num_green_stations, int N, 
+                                        int *longest_average_waiting_time, int *shortest_average_waiting_time) {
+    int i;
+    for (i = 0; i < num_green_stations; i++) {
+        if (*longest_average_waiting_time < double(green_station_waiting_times[i]) / double(N)) {
+            *longest_average_waiting_time = double(green_station_waiting_times[i]) / double(N);
+        }
+        if (*shortest_average_waiting_time > double(green_station_waiting_times[i] / double(N))) {
+            *shortest_average_waiting_time = double(green_station_waiting_times[i] / double(N));
+        }
+    }
+}
+
+double get_average_waiting_time(int green_station_waiting_times[], int num_green_stations, int N) {
+    int i;
+    int total_waiting_time = 0;
+    for (i = 0; i < num_green_stations; i++) {
+        total_waiting_time += green_station_waiting_times[i];
+    }
+    double average_waiting_time;
+    average_waiting_time = double(total_waiting_time) / double(num_green_stations);
+    average_waiting_time = average_waiting_time / double(N);
+    return average_waiting_time;
 }
 
 int get_next_station(int prev_station, int direction) {
@@ -216,25 +256,3 @@ int calculate_loadtime(){
     
     return 0
 }
-
-
-
-// MISC
-
-    // int waitingTime = 0;
-    // for (int i =0; i < 4; i ++) {
-    //     if (green_stations[i] != 1) {
-    //         continue;
-    //     }
-    //     // station has been visited.
-    //     // Go through each train. And see if any are in this station and are loading
-    //     bool trainIsLoading = false;
-    //     for (int k = 0; k < g; k ++) {
-    //         if (green_trains[k].station == i && green_trains[k].loading_time > 0) {
-    //             trainIsLoading = true;
-    //         }
-    //     }
-    //     if (!trainIsLoading) {
-    //         waitingTime += 1;
-    // }
-    //     }
