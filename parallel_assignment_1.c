@@ -101,7 +101,7 @@ int main(int argc, char *argv[])
     // TODO: Initialization step. Have to find some way to initialise this programmatically.
     // 2D matrix to store the status of each link.
     // value -1 : link is empty | 1 A train is on the link
-    int links_status[][];
+    int **links_status;
     int i;
     int j;
     for (i = 0; i < 8; i++) {
@@ -158,10 +158,6 @@ int main(int argc, char *argv[])
                             int current_all_station_index = get_all_station_index(starting_station, G, all_stations_list);
                             green_trains[i].loading_time = calculate_loadtime(all_stations_popularity_list[current_all_station_index]) - 1;
                         }
-                    } else {
-                        // A train as already entered the line. As only one train is 
-                        // allowed into the line in any time tick, we will skip this.
-                        continue;
                     }
                     }
 
@@ -293,7 +289,7 @@ void free_link(int current_station, int next_station, char *line_stations[], cha
 // Returns the index of a station in the "all_station_list"
 // index: all_station_list index
 int get_all_station_index(int line_station_index, char *line_stations[], char *all_stations_list[]) {
-    char *name = line_stations[line_station_index];
+    const char *name = line_stations[line_station_index];
     // TODO: HARDCODED value of number of stations
     for (int i = 0; i < 8; i ++) {
         if (strcmp(*name, all_stations_list[i]) == 1) { // returns 1 if there is a match.
