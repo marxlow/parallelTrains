@@ -1,6 +1,7 @@
 #include <omp.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include <limits.h>
 #define IN_TRANSIT 1
 #define IN_STATION 0
 #define NOT_IN_NETWORK -1
@@ -204,6 +205,35 @@ int main(int argc, char *argv[])
             }
         }
     }
+    double average_waiting_time = get_average_waiting_time(green_station_waiting_times, num_green_stations, N);
+    double longest_average_waiting_time = 0;
+    double shortest_average_waiting_time = INT_MAX;
+    get_longest_shortest_average_waiting_time(green_station_waiting_times, num_green_stations, N, &longest_average_waiting_time, &shortest_average_waiting_time);
+}
+
+void get_longest_shortest_average_waiting_time(int green_station_waiting_times[], int num_green_stations, int N, 
+                                        int *longest_average_waiting_time, int *shortest_average_waiting_time) {
+    int i;
+    for (i = 0; i < num_green_stations; i++) {
+        if (*longest_average_waiting_time < double(green_station_waiting_times[i]) / double(N)) {
+            *longest_average_waiting_time = double(green_station_waiting_times[i]) / double(N);
+        }
+        if (*shortest_average_waiting_time > double(green_station_waiting_times[i] / double(N))) {
+            *shortest_average_waiting_time = double(green_station_waiting_times[i] / double(N));
+        }
+    }
+}
+
+double get_average_waiting_time(int green_station_waiting_times[], int num_green_stations, int N) {
+    int i;
+    int total_waiting_time = 0;
+    for (i = 0; i < num_green_stations; i++) {
+        total_waiting_time += green_station_waiting_times[i];
+    }
+    double average_waiting_time;
+    average_waiting_time = double(total_waiting_time) / double(num_green_stations);
+    average_waiting_time = average_waiting_time / double(N);
+    return average_waiting_time;
 }
 
 int get_next_station(int prev_station, int direction) {
@@ -226,25 +256,3 @@ int calculate_loadtime(){
     
     return 0
 }
-
-
-
-// MISC
-
-    // int waitingTime = 0;
-    // for (int i =0; i < 4; i ++) {
-    //     if (green_stations[i] != 1) {
-    //         continue;
-    //     }
-    //     // station has been visited.
-    //     // Go through each train. And see if any are in this station and are loading
-    //     bool trainIsLoading = false;
-    //     for (int k = 0; k < g; k ++) {
-    //         if (green_trains[k].station == i && green_trains[k].loading_time > 0) {
-    //             trainIsLoading = true;
-    //         }
-    //     }
-    //     if (!trainIsLoading) {
-    //         waitingTime += 1;
-    // }
-    //     }
