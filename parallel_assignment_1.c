@@ -6,8 +6,12 @@
 #define NOT_IN_NETWORK -1
 
 #define NO_TRAINS -1
-#define LINK_IS_EMPTY -1
 
+// Links
+#define LINK_IS_EMPTY -1
+#define LINK_IS_USED 1
+
+// Direction
 #define LEFT 0
 #define RIGHT 1 
 
@@ -38,7 +42,7 @@ int main(int argc, char *argv[])
 {
     // NOTE: Hardcoded values from sample input
     int S = 10;                 // Number of train stations in the network
-    station_name L[S] = {       // List of stations
+    station_name all_stations_list[S] = {       // List of stations
         "changi",
         "tampines",
         "clementi",
@@ -48,7 +52,7 @@ int main(int argc, char *argv[])
         "bedok",
         "tuas"
     };                          
-    int m[S][S] = {             // Represents the graph
+    int link_transit_time[S][S] = {             // Represents the grap - 1;
         {0, 3, 0, 0, 0, 0, 0, 0},
         {3, 0, 8, 6, 0, 2, 0, 0},
         {0, 8, 0, 0, 4, 0, 0, 5},
@@ -61,7 +65,7 @@ int main(int argc, char *argv[])
     double P[S] = {
         0.9, 0.5, 0.2, 0.3, 0.7, 0.8, 0.4, 0.1
     }
-    station_name G[4] = {       // Stations in the green line
+    station_name green_stations[4] = {       // Stations in the green line
         "tuas",
         "clementi",
         "tampines",
@@ -87,7 +91,15 @@ int main(int argc, char *argv[])
 
 
     // TODO: Initialization step. Have to find some way to initialise this programmatically.
-    int links[4] = {LINK_IS_EMPTY, LINK_IS_EMPTY, LINK_IS_EMPTY, LINK_IS_EMPTY}; // -1 empty link
+    // 2D matrix to store the status of each link.
+    // value -1 : link is empty | 1 A train is on the link
+    int links_status[S][S]; 
+    for (int i = 0; i < S; i ++) {
+        for (int j = 0; j < S; j ++) {
+            links_status[i][j] = LINK_IS_EMPTY;
+        }
+    }
+
 
     train_type green_trains[g] = {
         {0, -1, -1, -1, -1},
@@ -141,18 +153,21 @@ int main(int argc, char *argv[])
                     if (green_trains[i].loading_time > 0) {
                         green_trains[i].loading_time--;
                     } else if (green_trains[i].loading_time == FINISHED_LOADING) {
-                        // Check if train can move into link.
-                        int link_index = get_next_link(station, direction, m, green_stations, L);
+                        // Get index of all_stations_list
+                        int current_station = green_trains[i].station;
+                        int current_all_station_index = get_all_station_index(current_station, green_stations, all_stations_list);
+                        int next_station = get_next_station(current_station, green_trains[i].direction, sizeof(green_stations));
+                        int next_all_station_index = get_all_station_index(next_station, green_stations, all_stations_list);
                         #pragma omp critical
                         // The link is currently occupied, wait in the station.
-                        if (link[link_index] >= 0) {
+                        if (links_status[current_all_station_index][next_all_station_index] == LINK_IS_USED ) {
                             continue;
                         } 
-                        // Link unoccupied, move train onto link
-                        link[link_index] = i;
+                        // Link unoccupied, move train to the link
+                        green_trains[i].transit_time = link_transit_time[current_all_station_index][next_all_station_index] - 1;
                         green_trains[i].status = IN_TRANSIT;
-                        green_trains[i].transit_time = get_transit_time();
                         green_trains[i].loading_time = WAITING_TO_LOAD;
+                        links_status[current_all_station_index][next_all_station_index] = LINK_IS_USED;
                     } else if (green_trains[i].loading_time == WAITING_TO_LOAD) {
                         // Seeing if this train can start loading
                         if (green_stations[green_trains[i].station] == READY_TO_LOAD) {
@@ -163,9 +178,21 @@ int main(int argc, char *argv[])
                 } else if (green_trains[i].status == IN_TRANSIT) {
                     if (green_trains[i].transit_time == 0) {
                         // Move the train to the station
-                        int next_station = get_next_station(green_trains[i].station, green_trains[i].direction);
-                        green_trains[i].station = nextStation;
-                        green_stations[next_station] = 1;
+                        int current_station = green_trains[i].station;
+                        int next_station = get_next_station(current_station, green_trains[i].direction, sizeof(green_stations));
+                        // Get next direction based on where the train is going.
+                        int next_direction;
+                        if (next_station > green_trains[i].station) {
+                            next_direction = RIGHT;
+                        } else {
+                            next_direction = LEFT;
+                        }
+                        // Free up the link the train was on.
+                        free_link(current_station, next_station, green_stations, all_stations_list, links_status)
+                        // Update Train
+                        green_trains[i].station = next_station;
+                        green_trains[i].direction = next_direction;
+                        green_trains[i].status = IN_STATION;
                     } else {
                         green_trains[i].transit_time -= 1;
                     }
@@ -182,19 +209,40 @@ int main(int argc, char *argv[])
     }
 }
 
-int get_next_station(int prev_station, int direction) {
-    return 0;
-}
-// TODO: Get the next link of the station
-// The parameters takes in the line that the train is in and the direction it is going.
-// RETURN: Index of the link in the link array. 
-// Also return the transit time? Or separate it into another function?
-int get_next_link(int station, int direction, int m[][], station_name line[], station_name L[]) {
-    return 0
+
+// Returns the index of the next station with the direction and previous station.
+// index: line_station index 
+int get_next_station(int prev_station, int direction, int num_stations)  {
+    if (direction == RIGHT) {
+        // Reached the end of the station
+        if (prev_station == num_stations - 1) {
+            return prev_station - 1;
+        }
+        return prev_station + 1;
+    }
+    // Reached the start of the station
+    if (prev_station == 0) {
+        return 1;
+    }
+    return prev_station -1;
 }
 
-int get_transit_time() {
-    return 0
+// Frees up the link
+void free_link(int current_station, int next_station, station_name line_stations[], station_name all_stations_list[], int links_status[][]) {
+    int current_all_station_index = get_all_station_index(current_station, line_stations, all_stations_list);
+    int next_all_station_index = get_all_station_index(next_station, line_stations, all_stations_list);
+    links_status[current_all_station_index][next_all_station_index] = LINK_IS_EMPTY;
+}
+
+// Returns the index of a station in the "all_station_list"
+// index: all_station_list index
+int get_all_station_index(int line_station_index, station_name line_stations[], station_name all_stations_list[]) {
+    char name = line_stations[line_station_index];
+    for (int i = 0; i < sizeof(all_stations_list); i ++) {
+        if (strcmp(name, all_stations_list[i]) == 1) { // returns 1 if there is a match.
+            return i;
+        }
+    }
 }
 
 // TODO: Finish calculate_loadtime
