@@ -1,14 +1,30 @@
 #include <omp.h>
 #include <stdio.h>
 #include <stdlib.h>
+#define IN_TRANSIT 1
+#define IN_STATION 0
+#define NOT_IN_NETWORK -1
 
+#define NO_TRAINS -1
+#define LINK_IS_EMPTY -1
+
+#define LEFT 0
+#define RIGHT 1 
+
+// Station status
+#define READY_TO_LOAD -1
+#define UNVISITED -2
+
+// Loading status
+#define WAITING_TO_LOAD -1
+#define FINISHED_LOADING 0
 
 struct train_type
 {
-    int loading_time;   // -1 for has not started loading yet | 0 for not loading| > 0 for currently loading
-    int in_transit;     // 1 for in transit | 0 for in station | -1 for not in line
+    int loading_time;   // -1 waiting to load | 0 has loaded finish at the station| > 0 for currently loading
+    int status;     // 1 for in transit | 0 for in station | -1 for not in network
     int direction;      // 1 for up  | 0 for down
-    int station;        // Integer denotes the index in the station array
+    int station;        // -1 for not in any station | > 0 for index of station it is in
     int transit_time;   // -1 for NA | > 0 for in transit
 }
 
@@ -65,22 +81,25 @@ int main(int argc, char *argv[])
         "harborfront"
     };
     int N = 10                  // Number of time ticks in the simulation (Iterations)
-    int g = 10                  // Number of trains in green line
+    int g = 4                  // Number of trains in green line
     int y = 10                  // Number of trains in yellow line
     int b = 10                  // Number of trains in blue line
 
 
-    // Creating global variables that are shared.
-    int links[4];
-    
-    // TODO: Have to find some way to initialise this programmatically.
+    // TODO: Initialization step. Have to find some way to initialise this programmatically.
+    int links[4] = {LINK_IS_EMPTY, LINK_IS_EMPTY, LINK_IS_EMPTY, LINK_IS_EMPTY}; // -1 empty link
+
     train_type green_trains[g] = {
-        {0, -1, 0, -1},
-        {0, -1, 0, -1},
-        {0, -1, 0, -1},
-        {0, -1, 0, -1}
+        {0, -1, -1, -1, -1},
+        {0, -1, -1, -1, -1},
+        {0, -1, -1, -1, -1},
+        {0, -1, -1, -1, -1}
     };
-    int green_stations[4]; 
+
+    // -2 : unvisited
+    // -1 : not loading
+    // >= 0: index of loading train
+    int green_stations[4] = { -2, -2, -2, -2 };
 
     // Set the number of threads to be = number of trains
     omp_set_num_threads(g);
@@ -91,50 +110,117 @@ int main(int argc, char *argv[])
         int i;
         // Boolean value to make sure that only 1 train enters the line at any time tick.
         int introduced_train = 0;
+
+        // Go through stations array, move all the 
+
         #pragma omp parallel shared(introduced_train) private(i)
         {
             // This iteration is going through all the trains in green line.
             // As i is private, each train is handled by a single thread.
             for (i = 0; i < g; i++) {
-                if (green_trains[i].in_transit == -1) {
+                if (green_trains[i].status == NOT_IN_NETWORK) {
                     #pragma omp critical
-                    if (introduced_train == 0) {
+                    if (introduced_train == 0)
+                        int starting_station = 0;
+                        // Introduce the train to the network and update.
                         introduced_train = 1;
-                        green_trains[i].in_transit = 0;
-                        // TODO: Currently starting off only from the first station. Need to start
-                        // off from last station too.
-                        green_trains[i].station = 0;
+                        green_trains[i].status = IN_STATION;
+                        green_trains[i].station = starting_station;
+                        if (green_stations[starting_station] == NO_TRAINS) {
+                            green_stations[starting_station] = i;
+                            // TODO: Get loading time of a train with a random function.
+                            green_trains[i].loading_time = calculate_loadtime() - 1;
+                        }
                     }
                     else {
                         // A train as already entered the line. As only one train is 
                         // allowed into the line in any time tick, we will skip this.
-                        continue
+                        continue;
                     }
-                } else if (green_trains[i].in_transit == 0) {
+                } else if (green_trains[i].status == IN_STATION) 
                     if (green_trains[i].loading_time > 0) {
                         green_trains[i].loading_time--;
-                    } else if (green_trains[i].loading_time == 0) {
-                        // TODO: Check if train can move into link.
-                    } else {
-                        // TODO: Check if train can start loading.
+                    } else if (green_trains[i].loading_time == FINISHED_LOADING) {
+                        // Check if train can move into link.
+                        int link_index = get_next_link(station, direction, m, green_stations, L);
+                        #pragma omp critical
+                        // The link is currently occupied, wait in the station.
+                        if (link[link_index] >= 0) {
+                            continue;
+                        } 
+                        // Link unoccupied, move train onto link
+                        link[link_index] = i;
+                        green_trains[i].status = IN_TRANSIT;
+                        green_trains[i].transit_time = get_transit_time();
+                        green_trains[i].loading_time = WAITING_TO_LOAD;
+                    } else if (green_trains[i].loading_time == WAITING_TO_LOAD) {
+                        // Seeing if this train can start loading
+                        if (green_stations[green_trains[i].station] == READY_TO_LOAD) {
+                            green_trains[i].loading_time = calculate_loadtime - 1;
+                            green_stations[green_trains[i].station] = i;
+                        }
                     }
-                } else {
+                } else if (green_trains[i].status == IN_TRANSIT) {
                     if (green_trains[i].transit_time == 0) {
-                        // TODO: Move train into station
+                        // Move the train to the station
+                        int next_station = get_next_station(green_trains[i].station, green_trains[i].direction);
+                        green_trains[i].station = nextStation;
+                        green_stations[next_station] = 1;
                     } else {
-                        green_trains[i].transit_time--;
+                        green_trains[i].transit_time -= 1;
                     }
                 }
             }
+            // Master thread consolidation:
+            // Step 1: 
+            // Go through all the stations, calculate the number of stations that are currently -1. Count them as waiting.  
+            // Step 2: 
+            // Go through all the stations, for every station that has a index (there is a train that was loading), check that train to see if loading time is > 0.
+            // if loading time == 0, we make station[train index] = WAITING_TO_LOAD
+
         }
     }
 }
 
+int get_next_station(int prev_station, int direction) {
+    return 0;
+}
+// TODO: Get the next link of the station
+// The parameters takes in the line that the train is in and the direction it is going.
+// RETURN: Index of the link in the link array. 
+// Also return the transit time? Or separate it into another function?
+int get_next_link(int station, int direction, int m[][], station_name line[], station_name L[]) {
+    return 0
+}
 
+int get_transit_time() {
+    return 0
+}
 
 // TODO: Finish calculate_loadtime
 int calculate_loadtime(){
-
-
+    
     return 0
 }
+
+
+
+// MISC
+
+    // int waitingTime = 0;
+    // for (int i =0; i < 4; i ++) {
+    //     if (green_stations[i] != 1) {
+    //         continue;
+    //     }
+    //     // station has been visited.
+    //     // Go through each train. And see if any are in this station and are loading
+    //     bool trainIsLoading = false;
+    //     for (int k = 0; k < g; k ++) {
+    //         if (green_trains[k].station == i && green_trains[k].loading_time > 0) {
+    //             trainIsLoading = true;
+    //         }
+    //     }
+    //     if (!trainIsLoading) {
+    //         waitingTime += 1;
+    // }
+    //     }
