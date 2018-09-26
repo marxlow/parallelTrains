@@ -292,7 +292,7 @@ int get_all_station_index(int line_station_index, char *line_stations[], char *a
     const char *name = line_stations[line_station_index];
     // TODO: HARDCODED value of number of stations
     for (int i = 0; i < 8; i ++) {
-        if (strcmp(*name, all_stations_list[i]) == 1) { // returns 1 if there is a match.
+        if (strcmp(name, all_stations_list[i]) == 1) { // returns 1 if there is a match.
             return i;
         }
     }
