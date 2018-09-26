@@ -45,6 +45,7 @@ int get_next_station(int prev_station, int direction, int num_stations);
 void free_link(int current_situation, int next_station, char *line_stations[], char *all_stations_list[], int links_status[][8]);
 int get_all_station_index(int line_station_index, char *line_stations[], char *all_stations_list[]);
 int calculate_loadtime(double popularity);
+void print_status(struct train_type green_trains[], int num_green_trains);
 
 int main(int argc, char *argv[]) 
 {
@@ -142,13 +143,11 @@ int main(int argc, char *argv[])
             // This iteration is going through all the trains in green line.
             // As i is private, each train is handled by a single thread.
             for (i = 0; i < g; i++) {
-//		printf("How many times am i here?\n");
                 if (green_trains[i].status == NOT_IN_NETWORK) {
                     #pragma omp critical
                     {
                     if (introduced_train == 0) {
-                        printf("Currently introducing a train.\n");
-			// TODO: starting station should alternate between ends of a line
+			            // TODO: starting station should alternate between ends of a line
                         int starting_station = 0;
                         // Introduce the train to the network and update.
                         introduced_train = 1;
@@ -232,6 +231,8 @@ int main(int argc, char *argv[])
                 }
             }
         }
+        printf("Current time tick = %d", &time_tick);
+        print_status(green_trains, g);
     }
     
     double average_waiting_time = get_average_waiting_time(green_station_waiting_times, num_green_stations, N);
@@ -239,6 +240,18 @@ int main(int argc, char *argv[])
     double shortest_average_waiting_time = INT_MAX;
     get_longest_shortest_average_waiting_time(green_station_waiting_times, num_green_stations, N, &longest_average_waiting_time, &shortest_average_waiting_time);
 }
+
+void print_status(struct train_type green_trains[], int num_green_trains) {
+    int i;
+    for (i = 0; i < num_green_trains; i++) {
+        if (green_trains[i].status == IN_STATION) {
+            printf("Train %d is currently in station %d", &i, &green_trains[i].station);
+        } else if (green_trains[i].status == IN_TRANSIT) {
+            printf("Train %d is currently in transit.", &i);
+        }
+    }   
+}
+
 
 void get_longest_shortest_average_waiting_time(int green_station_waiting_times[], int num_green_stations, int N, double *longest_average_waiting_time, double *shortest_average_waiting_time) {
     int i;
