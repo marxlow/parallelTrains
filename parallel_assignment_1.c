@@ -42,7 +42,7 @@ struct train_type
 void get_longest_shortest_average_waiting_time(int green_station_waiting_times[], int num_green_stations, int N, double *longest_average_waiting_time, double *shortest_average_waiting_time);
 double get_average_waiting_time(int green_station_waiting_times[], int num_green_stations, int N);
 int get_next_station(int prev_station, int direction, int num_stations);
-void free_link(int current_situation, int next_station, char *line_stations[], char *all_stations_list[], int **links_status);
+void free_link(int current_situation, int next_station, char *line_stations[], char *all_stations_list[], int links_status[][8]);
 int get_all_station_index(int line_station_index, char *line_stations[], char *all_stations_list[]);
 int calculate_loadtime(double popularity);
 
@@ -92,7 +92,7 @@ int main(int argc, char *argv[])
         "downtown",
         "harborfront"
     };
-    int N = 10;                  // Number of time ticks in the simulation (Iterations)
+    int N = 2;                  // Number of time ticks in the simulation (Iterations)
     int g = 4;                  // Number of trains in green line
     int y = 10;                  // Number of trains in yellow line
     int b = 10;                  // Number of trains in blue line
@@ -101,13 +101,13 @@ int main(int argc, char *argv[])
     // TODO: Initialization step. Have to find some way to initialise this programmatically.
     // 2D matrix to store the status of each link.
     // value -1 : link is empty | 1 A train is on the link
-    int **links_status;
+    int links_status[8][8];
     int i;
     int j;
     for (i = 0; i < 8; i++) {
         for (j = 0; j < 8; j++) {
             links_status[i][j] = LINK_IS_EMPTY;
-        }
+	}
     }
 
     struct train_type green_trains[4] = {
@@ -142,11 +142,13 @@ int main(int argc, char *argv[])
             // This iteration is going through all the trains in green line.
             // As i is private, each train is handled by a single thread.
             for (i = 0; i < g; i++) {
+//		printf("How many times am i here?\n");
                 if (green_trains[i].status == NOT_IN_NETWORK) {
                     #pragma omp critical
                     {
                     if (introduced_train == 0) {
-                        // TODO: starting station should alternate between ends of a line
+                        printf("Currently introducing a train.\n");
+			// TODO: starting station should alternate between ends of a line
                         int starting_station = 0;
                         // Introduce the train to the network and update.
                         introduced_train = 1;
@@ -280,7 +282,7 @@ int get_next_station(int prev_station, int direction, int num_stations)  {
 }
 
 // Frees up the link
-void free_link(int current_station, int next_station, char *line_stations[], char *all_stations_list[], int **links_status) {
+void free_link(int current_station, int next_station, char *line_stations[], char *all_stations_list[], int links_status[][8]) {
     int current_all_station_index = get_all_station_index(current_station, line_stations, all_stations_list);
     int next_all_station_index = get_all_station_index(next_station, line_stations, all_stations_list);
     links_status[current_all_station_index][next_all_station_index] = LINK_IS_EMPTY;
