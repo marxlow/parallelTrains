@@ -29,6 +29,14 @@
 #define WAITING_TO_LOAD -1
 #define FINISHED_LOADING 0
 
+
+void get_longest_shortest_average_waiting_time(int green_station_waiting_times[], int num_green_stations, int N, int *longest_average_waiting_time, int *shortest_average_waiting_time);
+double get_average_waiting_time(int green_station_waiting_times[], int num_green_stations, int N);
+int get_next_station(int prev_station, int direction, int num_stations);
+void free_link(int current_situation, int next_station, struct station_name line_stations[], struct station_name all_stations_list[], int **links_status);
+int get_all_station_index(int line_station_index, struct station_name line_stations[], struct station_name all_stations_list[]);
+int calculate_loadtime(double popularity);
+
 struct train_type
 {
     int loading_time;   // -1 waiting to load | 0 has loaded finish at the station| > 0 for currently loading
@@ -58,7 +66,7 @@ int main(int argc, char *argv[])
         "bedok",
         "tuas"
     };                          
-    int link_transit_time[S][S] = {             // Represents the grap - 1;
+    int link_transit_time[8][8] = {             // Represents the grap - 1;
         {0, 3, 0, 0, 0, 0, 0, 0},
         {3, 0, 8, 6, 0, 2, 0, 0},
         {0, 8, 0, 0, 4, 0, 0, 5},
@@ -68,7 +76,7 @@ int main(int argc, char *argv[])
         {0, 0, 0, 0, 10, 0, 0, 0},
         {0, 0, 5, 0, 0, 0, 0, 0},
     };                          
-    double all_stations_popularity_list[S] = {
+    double all_stations_popularity_list[8] = {
         0.9, 0.5, 0.2, 0.3, 0.7, 0.8, 0.4, 0.1
     };
     const char *G[] = {       // Stations in the green line
@@ -99,16 +107,16 @@ int main(int argc, char *argv[])
     // TODO: Initialization step. Have to find some way to initialise this programmatically.
     // 2D matrix to store the status of each link.
     // value -1 : link is empty | 1 A train is on the link
-    int links_status[S][S];
+    int links_status[8][8];
     int i;
     int j;
-    for (i = 0; i < S; i++) {
-        for (j = 0; j < S; j++) {
+    for (i = 0; i < 8; i++) {
+        for (j = 0; j < 8; j++) {
             links_status[i][j] = LINK_IS_EMPTY;
         }
     }
 
-    struct train_type green_trains[g] = {
+    struct train_type green_trains[4] = {
         {0, -1, -1, -1, -1},
         {0, -1, -1, -1, -1},
         {0, -1, -1, -1, -1},
@@ -120,8 +128,8 @@ int main(int argc, char *argv[])
     // -1 : not loading
     // >= 0: index of loading train
     int num_green_stations = 4;
-    int green_stations[num_green_stations] = {UNVISITED, UNVISITED, UNVISITED, UNVISITED};
-    int green_station_waiting_times[num_green_stations];
+    int green_stations[4] = {UNVISITED, UNVISITED, UNVISITED, UNVISITED};
+    int green_station_waiting_times[4];
     for (i = 0 ; i < num_green_stations; i++) {
         green_station_waiting_times[i] = 0;
     }
@@ -285,7 +293,7 @@ int get_next_station(int prev_station, int direction, int num_stations)  {
 }
 
 // Frees up the link
-void free_link(int current_station, int next_station, station_name line_stations[], station_name all_stations_list[], int links_status[][]) {
+void free_link(int current_station, int next_station, struct station_name line_stations[], struct station_name all_stations_list[], int links_status[][]) {
     int current_all_station_index = get_all_station_index(current_station, line_stations, all_stations_list);
     int next_all_station_index = get_all_station_index(next_station, line_stations, all_stations_list);
     #pragma omp atomic 
@@ -296,7 +304,7 @@ void free_link(int current_station, int next_station, station_name line_stations
 
 // Returns the index of a station in the "all_station_list"
 // index: all_station_list index
-int get_all_station_index(int line_station_index, station_name line_stations[], station_name all_stations_list[]) {
+int get_all_station_index(int line_station_index, struct station_name line_stations[], struct station_name all_stations_list[]) {
     char name = line_stations[line_station_index];
     for (int i = 0; i < sizeof(all_stations_list); i ++) {
         if (strcmp(name, all_stations_list[i]) == 1) { // returns 1 if there is a match.
