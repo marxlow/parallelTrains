@@ -246,14 +246,13 @@ int main(int argc, char *argv[])
     get_longest_shortest_average_waiting_time(green_station_waiting_times, num_green_stations, N, &longest_average_waiting_time, &shortest_average_waiting_time);
 }
 
-void get_longest_shortest_average_waiting_time(int green_station_waiting_times[], int num_green_stations, int N, 
-                                        int *longest_average_waiting_time, int *shortest_average_waiting_time) {
+void get_longest_shortest_average_waiting_time(int green_station_waiting_times[], int num_green_stations, int N, int *longest_average_waiting_time, int *shortest_average_waiting_time) {
     int i;
     for (i = 0; i < num_green_stations; i++) {
-        if (*longest_average_waiting_time < double(green_station_waiting_times[i]) / double(N)) {
+        if (*longest_average_waiting_time < (double(green_station_waiting_times[i]) / double(N)) {
             *longest_average_waiting_time = double(green_station_waiting_times[i]) / double(N);
         }
-        if (*shortest_average_waiting_time > double(green_station_waiting_times[i] / double(N))) {
+        if (*shortest_average_waiting_time > (double(green_station_waiting_times[i] / double(N)))) {
             *shortest_average_waiting_time = double(green_station_waiting_times[i] / double(N));
         }
     }
