@@ -370,7 +370,7 @@ int main(int argc, char *argv[])
     int z;
     printf("~~~~~ END OF NETWORK!!! ~~~~~\n");
     for (z = 0; z < sizeof(green_station_waiting_times); z++) {
-        printf("Station %d, waiting time: %d", z, green_station_waiting_times[z] );
+        printf("Station %d, waiting time: %d\n", z, green_station_waiting_times[z] );
     }
     double average_waiting_time = get_average_waiting_time(green_station_waiting_times, num_green_stations, N);
     double longest_average_waiting_time = 0;
