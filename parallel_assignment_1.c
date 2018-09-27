@@ -136,14 +136,14 @@ int get_next_station(int prev_station, int direction, int num_stations)
         // Reached the end of the station
         if (prev_station == num_stations - 1)
         {
-            return prev_station;
+            return prev_station -1;
         }
         return prev_station + 1;
     }
     // Reached the start of the station
     if (prev_station == 0)
     {
-        return 0;
+        return 1;
     }
     return prev_station - 1;
 }
@@ -397,9 +397,12 @@ int main(int argc, char *argv[])
                 int next_station = get_next_station(current_station, green_trains[i].direction, num_green_stations);
                 // Get next direction based on where the train is going.
                 int next_direction = green_trains[i].direction;
-                if (next_station == current_station)
+                if (next_station < current_station)
                 {
-                    next_direction = change_train_direction(next_direction);
+                    next_direction = LEFT;
+                } else 
+                {
+                    next_direction = RIGHT;
                 }
                 // Free up the link the train was on.
                 free_link(S, current_station, next_station, G, all_stations_list, links_status);
