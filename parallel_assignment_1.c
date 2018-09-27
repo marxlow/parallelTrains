@@ -78,7 +78,6 @@ void print_status(struct train_type green_trains[], int num_green_trains, char *
             int current_station = green_trains[i].station;
             int next_station = get_next_station(current_station, green_trains[i].direction, num_green_stations);
             printf("Train %d is currently in transit %s->%s | With transit time: %d \n", i, G[current_station], G[next_station], green_trains[i].transit_time);
-            // printf("Current train direction = %d\n", green_trains[i].direction);
         }
     }
 }
@@ -393,11 +392,18 @@ int main(int argc, char *argv[])
         printf("~~~~~ END OF ITERATION ~~~~\n");
         for (i = 0; i < 2; i++) 
         {
+            char *c;
+            if (i == 0) {
+                c = "left";
+            } else {
+                c = "right";
+            }
             for (j = 0; j < num_green_stations; j++)
             {
                 if (green_stations[i][j] == READY_TO_LOAD)
                 {
-                    printf("Station index %d (at %d) is waiting\n", i, j);
+
+                    printf("(%s) Station %d is waiting\n", c, j);
                     green_station_waiting_times[i][j] += 1;
                 }
             }
