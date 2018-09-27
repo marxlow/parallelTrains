@@ -295,6 +295,7 @@ int main(int argc, char *argv[])
                 }
 #pragma omp critical
                 {
+                    printf("~~~ Debug here ~~~ Train %d, with status: %d , with loading time %d, with station status: %d", i, green_trains[i].status, green_trains[i].loading_time, green_trains[i].station)
                     // Train is waiting on an empty station, we can start loading
                     if (green_trains[i].status == IN_STATION && green_trains[i].loading_time == WAITING_TO_LOAD && green_stations[green_trains[i].station] == READY_TO_LOAD)
                     {
@@ -356,7 +357,6 @@ int main(int argc, char *argv[])
                 }
             }
         }
-        // printf("Current time tick = %d", time_tick);
         print_status(green_trains, g);
         printf("\n\n");
     }
