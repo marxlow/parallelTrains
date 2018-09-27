@@ -1,5 +1,7 @@
 /*
- * ASSUMPTIONS: Only one train at a time can load at a station
+ * ASSUMPTIONS: 
+ * 1. Only one train at a time can load at a station
+ * 2. Upon reaching a terminal station (Tamp -> Changi | direction: Right). Train will load for station[right][changi] rather than station[left][changi]. 
 */
 #include <omp.h>
 #include <stdio.h>
@@ -176,7 +178,7 @@ int calculate_loadtime(double popularity)
 
 int main(int argc, char *argv[])
 {
-    // NOTE: Hardcoded values from sample input
+    // TODO: READ VALUES FROM INPUT INSTEAD.
     int S = 8;                   // Number of train stations in the network
     char *all_stations_list[] = {// List of stations
                                  "changi",
@@ -217,43 +219,78 @@ int main(int argc, char *argv[])
                  "downtown",
                  "harborfront"};
     int N = 40;  // Number of time ticks in the simulation (Iterations)
-    int g = 1;  // Number of trains in green line
+    int total_lines = 1; // Number of lines operating innetwork
+    int g = 4;  // Number of trains in green line
     int y = 10; // Number of trains in yellow line
     int b = 10; // Number of trains in blue line
-
-    // TODO: Initialization step. Have to find some way to initialise this programmatically.
-    // 2D matrix to store the status of each link.
-    // value -1 : link is empty | 1 A train is on the link
-    int links_status[8][8];
     int i;
     int j;
-    for (i = 0; i < 8; i++)
+    int k;
+
+    // Initialize Link status. -1: Link is empty | 1: Link is used
+    int links_status[S][S];
+    for (i = 0; i < S; i++)
     {
-        for (j = 0; j < 8; j++)
+        for (j = 0; j < S; j++)
         {
             links_status[i][j] = LINK_IS_EMPTY;
         }
     }
 
-    struct train_type green_trains[4] = {
-        {WAITING_TO_LOAD, NOT_IN_NETWORK, RIGHT, -1, -1},
-        {WAITING_TO_LOAD, NOT_IN_NETWORK, RIGHT, -1, -1},
-        {WAITING_TO_LOAD, NOT_IN_NETWORK, RIGHT, -1, -1},
-        {WAITING_TO_LOAD, NOT_IN_NETWORK, RIGHT, -1, -1}};
+    // Initialize all trains,
+    struct train_type green_trains[g];
+    struct train_type yellow_trains[y];
+    struct train_type blue_trains[b];
+    for (i = 0; i < g; i ++) 
+    {
+        green_trains[i] = {WAITING_TO_LOAD, NOT_IN_NETWORK, RIGHT, -1, -1};
+    }
+    for (i = 0; i < y; i ++) 
+    {
+        yellow_trains[i] = {WAITING_TO_LOAD, NOT_IN_NETWORK, RIGHT, -1, -1};
+    }
+    for (i = 0; i < b; i ++) 
+    {
+        blue_trains[i] = {WAITING_TO_LOAD, NOT_IN_NETWORK, RIGHT, -1, -1};
+    }
 
-    // TODO: Programmatically find the number of stations in the green line.
-    // -2 : unvisited
-    // -1 : not loading
-    // >= 0: index of loading train
+    // Initialize all stations. -2 : unvisited | -1 : not loading | >= 0: index of loading train
     int num_green_stations = 4;
-    int green_stations[2][4] = {
-        {UNVISITED, UNVISITED, UNVISITED, UNVISITED},
-        {UNVISITED, UNVISITED, UNVISITED, UNVISITED}
-    };
-    // This array is to keep track of the overall waiting times at EACH station.
-    int green_station_waiting_times[2][4] = { 0 };
+    int num_yellow_stations = 5;
+    int num_blue_stations = 4;
+    int green_stations[2][num_green_stations];
+    int yellow_stations[2][num_yellow_stations];
+    int blue_stations[2][num_blue_stations];
+    for (i = 0; i < 2; i ++) 
+    {
+        for (j = 0; j < num_green_stations; j ++)
+        {
+            green_stations[i][j] = UNVISITED;
+        }
+    }
+    for (i = 0; i < 2; i ++) 
+    {
+        for (j = 0; j < num_yellow_stations; j ++)
+        {
+            yellow_stations[i][j] = UNVISITED;
+        }
+    }
+    for (i = 0; i < 2; i ++) 
+    {
+        for (j = 0; j < num_blue_stations; j ++)
+        {
+            blue_stations[i][j] = UNVISITED;
+        }
+    }
+
+    // Initialize all arrays to track waiting time at each station of each line
+    int green_station_waiting_times[2][num_green_stations] = { 0 };
+    int yellow_station_waiting_times[2][num_yellow_stations] = { 0 };
+    int blue_station_waiting_times[2][num_blue_stations] = { 0 };
+
     // Set the number of threads to be = number of trains
-    omp_set_num_threads(g);
+    int num_all_trains = g + y + b;
+    omp_set_num_threads(num_all_trains);
 
     int time_tick;
     for (time_tick = 0; time_tick < N; time_tick++)
