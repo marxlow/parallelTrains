@@ -47,7 +47,7 @@ struct train_type
 };
 
 // FUNCTION DECLARATIONS $$ DO NOT REMOVE.
-void print_status(struct train_type green_trains[], int num_green_trains, char *G[], int num_green_stations);
+void print_status(struct train_type trains[], int num_trains, char *G[], int num_stations);
 void get_longest_shortest_average_waiting_time(int num_green_stations, int green_station_waiting_times[][4], int N, double *longest_average_waiting_time, double *shortest_average_waiting_time);
 double get_average_waiting_time(int num_green_stations, int green_station_waiting_times[][num_green_stations], int N);
 int get_next_station(int prev_station, int direction, int num_stations);
@@ -64,20 +64,31 @@ int change_train_direction(int direction)
     return direction % 2;
 }
 
-void print_status(struct train_type green_trains[], int num_green_trains, char *G[], int num_green_stations)
+void print_status(struct train_type trains[], int num_trains, char *G[], int num_stations)
 {
     int i;
-    for (i = 0; i < num_green_trains; i++)
-        {
-        if (green_trains[i].status == IN_STATION)
-        {
-            printf("Train %d is currently in station %d | With loading time: %d \n", i, green_trains[i].station, green_trains[i].loading_time);
+    printf("~~~~~~~~~~ TRAIN STATUS ~~~~~~~~~~~\n");
+    for (i = 0; i < num_trains; i++)
+    {
+        char *direction;
+        if (trains[i].direction == LEFT) {
+            direction = "Left";
+        } else {
+            direction = "Right";
         }
-        else if (green_trains[i].status == IN_TRANSIT)
+
+        if (trains[i].status == IN_STATION && trains[i].loading_time == WAITING_TO_LOAD)
         {
-            int current_station = green_trains[i].station;
-            int next_station = get_next_station(current_station, green_trains[i].direction, num_green_stations);
-            printf("Train %d is currently in transit %s->%s | With transit time: %d \n", i, G[current_station], G[next_station], green_trains[i].transit_time);
+            printf("Train %d is currently in (%s) station %d | Waiting to load...\n", i, direction, trains[i].station);
+        }
+        else if (trains[i].status == IN_STATION) {
+            printf("Train %d is currently in (%s) station %d | With %d ticks left to load\n", i, direction, trains[i].station, trains[i].loading_time);
+        }
+        else if (trains[i].status == IN_TRANSIT)
+        {
+            int current_station = trains[i].station;
+            int next_station = get_next_station(current_station, trains[i].direction, num_stations);
+            printf("Train %d is currently in transit %s->%s | With %d ticks left to transit.\n", i, G[current_station], G[next_station], trains[i].transit_time);
         }
     }
 }
@@ -414,8 +425,6 @@ int main(int argc, char *argv[])
         {
             for (j = 0; j < num_green_stations; j++)
             {
-                // printf("Station %d :145
-                // With train index: %d, with train loading time: %d\n", i, green_stations[i], green_trains[green_stations[i]].loading_time);
                 int green_train_index = green_stations[i][j];
                 if (green_train_index >= 0)
                 {
