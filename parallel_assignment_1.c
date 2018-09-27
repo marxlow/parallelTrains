@@ -67,7 +67,7 @@ int change_train_direction(int direction)
 void print_status(struct train_type trains[], int num_trains, char *G[], int num_stations)
 {
     int i;
-    printf("~~~~~~~~~~ TRAIN STATUS ~~~~~~~~~~~\n");
+    printf("\n~~~~~~~~~~ TRAIN STATUS ~~~~~~~~~~~\n");
     for (i = 0; i < num_trains; i++)
     {
         char *direction;
@@ -458,7 +458,6 @@ int main(int argc, char *argv[])
                 green_trains[i].station = next_station;
                 green_trains[i].direction = next_direction;
                 green_trains[i].status = IN_STATION;
-                printf("Train %d has landed in station index %d (at %d).\n\n", i, next_direction, next_station);
                 // Update Stations
                 if (green_stations[next_direction][next_station] == UNVISITED) 
                 {
