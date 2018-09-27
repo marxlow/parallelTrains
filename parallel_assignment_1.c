@@ -338,7 +338,7 @@ int main(int argc, char *argv[])
             }
         }
         // Free up links where the loading train was on
-        for (i = 0; i < num_green_trains; i ++) {
+        for (i = 0; i < g; i ++) {
             if (green_trains[i].status == IN_TRANSIT && green_trains[i].transit_time == 0)
             {
                 // Move the train to the station
