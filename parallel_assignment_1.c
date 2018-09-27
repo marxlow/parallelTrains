@@ -274,7 +274,8 @@ int main(int argc, char *argv[])
                 if (green_trains[i].loading_time > 0)
                 {
                     green_trains[i].loading_time--;
-                    if (green_trans[i].loading_time == 0) {
+                    if (green_trains[i].loading_time == 0) {
+                        int current_station = green_trains[i].station;
                         green_stations[current_station] = READY_TO_LOAD;
                     }
                 }
@@ -303,7 +304,7 @@ int main(int argc, char *argv[])
                         }
                     }
                 }
-                // Train is waiting on an empty station, we can start loading.
+                // Train is waiting on an empty station, we can start loading
                 else if (green_trains[i].loading_time == WAITING_TO_LOAD && green_stations[green_trains[i].station] == READY_TO_LOAD)
                 {
                     // index_of_station = get_all_station_index(i, green_stations, all_stations_list, )
