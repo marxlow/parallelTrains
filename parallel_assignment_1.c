@@ -124,13 +124,10 @@ void free_link(int current_station, int next_station, char *line_stations[], cha
 int get_all_station_index(int line_station_index, char *line_stations[], char *all_stations_list[])
 {
     const char *name = line_stations[line_station_index];
-    printf("Name of station being compared: %s\n", name);
-    // TODO: HARDCODED value of number of stations
-    for (int i = 0; i < 8; i++)
+    for (int i = 0; i < sizeof(all_stations_list); i++)
     {
         if (strcmp(name, all_stations_list[i]) == 0)
-        { // returns 1 if there is a match.
-            printf("Name of station being compared to: %s\n", all_stations_list[i]);
+        {
             return i;
         }
     }
