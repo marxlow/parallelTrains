@@ -181,7 +181,7 @@ int main(int argc, char *argv[])
                  "tampines",
                  "downtown",
                  "harborfront"};
-    int N = 1000;  // Number of time ticks in the simulation (Iterations)
+    int N = 10;  // Number of time ticks in the simulation (Iterations)
     int g = 2;  // Number of trains in green line
     int y = 10; // Number of trains in yellow line
     int b = 10; // Number of trains in blue line
@@ -322,7 +322,7 @@ int main(int argc, char *argv[])
         {
             if (green_stations[i] == READY_TO_LOAD)
             {
-                printf("Station %d is waiting\n", i)
+                printf("Station %d is waiting\n", i);
                 green_station_waiting_times[i]++;
             }
         }
@@ -367,7 +367,11 @@ int main(int argc, char *argv[])
         print_status(green_trains, g);
         printf("\n\n");
     }
-
+    int z;
+    printf("~~~~~ END OF NETWORK!!! ~~~~~\n");
+    for (z = 0; z < sizeof(green_station_waiting_times); z++) {
+        printf("Station %d, waiting time: %d", z, green_station_waiting_times[z] );
+    }
     double average_waiting_time = get_average_waiting_time(green_station_waiting_times, num_green_stations, N);
     double longest_average_waiting_time = 0;
     double shortest_average_waiting_time = INT_MAX;
