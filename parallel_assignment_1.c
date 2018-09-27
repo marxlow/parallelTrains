@@ -257,7 +257,7 @@ int main(int argc, char *argv[])
                         // If no trains are loading. We will start loading the introduced train immediately.
                         if (green_stations[starting_station] == READY_TO_LOAD)
                         {
-                            green_stations[starting_station] = LOADING;
+                            green_stations[starting_station] = i;
                             //int current_all_station_index = get_all_station_index(starting_station, G, all_stations_list);
                             green_trains[i].loading_time = 2;
                             printf("Setting train %d as loading time %d.\n", i, green_trains[i].loading_time);
@@ -288,7 +288,6 @@ int main(int argc, char *argv[])
                             green_trains[i].transit_time = link_transit_time[current_all_station_index][next_all_station_index] - 1;
                             printf("Transiting green train %d with transit time %d\n", i, green_trains[i].transit_time);
                             green_trains[i].status = IN_TRANSIT;
-                            green_trains[i].loading_time = WAITING_TO_LOAD;
                             links_status[current_all_station_index][next_all_station_index] = LINK_IS_USED;
                         }
                     }
@@ -353,8 +352,9 @@ int main(int argc, char *argv[])
             int green_train_index = green_stations[i];
             if (green_train_index >= 0)
             {
-                if (green_trains[green_train_index].loading_time == 0)
+                if (green_trains[green_train_index].loading_time == FINISHED_LOADING)
                 {
+                    green_trains[green_train_index].loading_time = WAITING_TO_LOAD;
                     green_stations[i] = READY_TO_LOAD;
                 }
             }
