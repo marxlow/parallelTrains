@@ -63,13 +63,16 @@ void get_longest_shortest_average_waiting_time(int green_station_waiting_times[]
     int i;
     for (i = 0; i < num_green_stations; i++)
     {
-        if (*longest_average_waiting_time < (double)green_station_waiting_times[i] / (double)N)
+        double waiting_time = (double)green_station_waiting_times[i];
+        double station_average_waiting_time = waiting_time / (double)N;
+        // Update waiting times
+        if (*longest_average_waiting_time < station_average_waiting_time)
         {
-            *longest_average_waiting_time = (double)green_station_waiting_times[i] / (double)N;
+            *longest_average_waiting_time = station_average_waiting_time;
         }
-        if (*shortest_average_waiting_time > (double)green_station_waiting_times[i] / (double)N)
+        if (*shortest_average_waiting_time > station_average_waiting_time)
         {
-            *shortest_average_waiting_time = (double)green_station_waiting_times[i] / (double)N;
+            *shortest_average_waiting_time = station_average_waiting_time;
         }
     }
 }
@@ -369,8 +372,8 @@ int main(int argc, char *argv[])
     }
     int z;
     printf("~~~~~ END OF NETWORK!!! ~~~~~\n");
-    for (z = 0; z < sizeof(green_station_waiting_times); z++) {
-        printf("Station %d, waiting time: %d\n", z, green_station_waiting_times[z] );
+    for (z = 0; z < num_green_stations; z++) {
+        printf("Station %d, waiting time: %d\n", z, green_station_waiting_times[z]);
     }
     double average_waiting_time = get_average_waiting_time(green_station_waiting_times, num_green_stations, N);
     double longest_average_waiting_time = 0;
