@@ -313,6 +313,7 @@ int main(int argc, char *argv[])
         int introduced_train_right = NOT_INTRODUCED;
 
 #pragma omp parallel for shared(introduced_train_left, introduced_train_right, green_stations, green_trains) private(i)
+        {
         // This iteration is going through all the trains in green line.
         for (i = 0; i < g; i++)
         {   
@@ -396,6 +397,7 @@ int main(int argc, char *argv[])
                 green_trains[i].transit_time--;
             }
         }
+        }
 
         // Master thread consolidation:
         // Count the waiting times at each station.
@@ -412,7 +414,6 @@ int main(int argc, char *argv[])
             {
                 if (green_stations[i][j] == READY_TO_LOAD)
                 {
-
                     printf("(%s) Station %d is waiting\n", c, j);
                     green_station_waiting_times[i][j] += 1;
                 }
