@@ -304,13 +304,16 @@ int main(int argc, char *argv[])
                         }
                     }
                 }
-                // Train is waiting on an empty station, we can start loading
-                else if (green_trains[i].loading_time == WAITING_TO_LOAD && green_stations[green_trains[i].station] == READY_TO_LOAD)
+#pragma omp critical
                 {
-                    // index_of_station = get_all_station_index(i, green_stations, all_stations_list, )
-                    green_trains[i].loading_time = 2;
-                    // green_trains[i].loading_time = calculate_loadtime(all_stations_popularity_list[2]) - 1;
-                    green_stations[green_trains[i].station] = i;
+                    // Train is waiting on an empty station, we can start loading
+                    else if (green_trains[i].loading_time == WAITING_TO_LOAD && green_stations[green_trains[i].station] == READY_TO_LOAD)
+                    {
+                        // index_of_station = get_all_station_index(i, green_stations, all_stations_list, )
+                        green_trains[i].loading_time = 2;
+                        // green_trains[i].loading_time = calculate_loadtime(all_stations_popularity_list[2]) - 1;
+                        green_stations[green_trains[i].station] = i;
+                    }
                 }
             }
             else if (green_trains[i].status == IN_TRANSIT)
