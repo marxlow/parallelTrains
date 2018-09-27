@@ -40,6 +40,15 @@ struct train_type
     int transit_time; // -1 for NA | > 0 for in transit
 };
 
+// FUNCTION DECLARATIONS $$ DO NOT REMOVE.
+void print_status(struct train_type green_trains[], int num_green_trains);
+void get_longest_shortest_average_waiting_time(int num_green_stations, int green_station_waiting_times[][4], int N, double *longest_average_waiting_time, double *shortest_average_waiting_time);
+double get_average_waiting_time(int num_green_stations, int green_station_waiting_times[][num_green_stations], int N);
+int get_next_station(int prev_station, int direction, int num_stations);
+void free_link(int num_stations, int current_station, int next_station, char *line_stations[], char *all_stations_list[], int links_status[][8]);
+int get_all_station_index(int num_stations, int line_station_index, char *line_stations[], char *all_stations_list[]);
+int calculate_loadtime(double popularity);
+
 
 // FUNCTIONS
 void print_status(struct train_type green_trains[], int num_green_trains)
@@ -90,7 +99,7 @@ double get_average_waiting_time(int num_green_stations, int green_station_waitin
     {
         for (j = 0; j < num_green_stations; j++) 
         {
-            total_waiting_time += green_station_waiting_times[i];
+            total_waiting_time += *green_station_waiting_times[i];
         }
     }
     double average_waiting_time;
@@ -121,19 +130,19 @@ int get_next_station(int prev_station, int direction, int num_stations)
 }
 
 // Frees up the link
-void free_link(int current_station, int next_station, char *line_stations[], char *all_stations_list[], int links_status[][8])
+void free_link(int num_stations, int current_station, int next_station, char *line_stations[], char *all_stations_list[], int links_status[][8])
 {
-    int current_all_station_index = get_all_station_index(current_station, line_stations, all_stations_list);
-    int next_all_station_index = get_all_station_index(next_station, line_stations, all_stations_list);
+    int current_all_station_index = get_all_station_index(num_stations, current_station, line_stations, all_stations_list);
+    int next_all_station_index = get_all_station_index(num_stations, next_station, line_stations, all_stations_list);
     links_status[current_all_station_index][next_all_station_index] = LINK_IS_EMPTY;
 }
 
 // Returns the index of a station in the "all_station_list"
 // index: all_station_list index
-int get_all_station_index(int line_station_index, char *line_stations[], char *all_stations_list[])
+int get_all_station_index(int num_stations, int line_station_index, char *line_stations[], char *all_stations_list[])
 {
     const char *name = line_stations[line_station_index];
-    for (int i = 0; i < sizeof(all_stations_list); i++)
+    for (int i = 0; i < num_stations; i++)
     {
         if (strcmp(name, all_stations_list[i]) == 0)
         {
@@ -282,9 +291,9 @@ int main(int argc, char *argv[])
                 else if (green_trains[i].loading_time == FINISHED_LOADING)
                 {
                     int current_station = green_trains[i].station;
-                    int current_all_station_index = get_all_station_index(current_station, G, all_stations_list);
+                    int current_all_station_index = get_all_station_index(S, current_station, G, all_stations_list);
                     int next_station = get_next_station(current_station, green_trains[i].direction, num_green_stations);
-                    int next_all_station_index = get_all_station_index(next_station, G, all_stations_list);
+                    int next_all_station_index = get_all_station_index(S, next_station, G, all_stations_list);
 #pragma omp critical
                     {
                         // The link is currently occupied, wait in the station.
@@ -338,7 +347,8 @@ int main(int argc, char *argv[])
         {
             for (j = 0; j < num_green_stations; j++)
             {
-                // printf("Station %d , With train index: %d, with train loading time: %d\n", i, green_stations[i], green_trains[green_stations[i]].loading_time);
+                // printf("Station %d :145
+                // With train index: %d, with train loading time: %d\n", i, green_stations[i], green_trains[green_stations[i]].loading_time);
                 int green_train_index = green_stations[i][j];
                 if (green_train_index >= 0)
                 {
@@ -368,7 +378,7 @@ int main(int argc, char *argv[])
                     next_direction = LEFT;
                 }
                 // Free up the link the train was on.
-                free_link(current_station, next_station, G, all_stations_list, links_status);
+                free_link(S, current_station, next_station, G, all_stations_list, links_status);
                 // Update Train
                 green_trains[i].station = next_station;
                 green_trains[i].direction = next_direction;
