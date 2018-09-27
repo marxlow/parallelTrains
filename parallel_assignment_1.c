@@ -225,7 +225,7 @@ int main(int argc, char *argv[])
     int green_stations[2][4] = {
         {UNVISITED, UNVISITED, UNVISITED, UNVISITED},
         {UNVISITED, UNVISITED, UNVISITED, UNVISITED}
-    }
+    };
     // This array is to keep track of the overall waiting times at EACH station.
     int green_station_waiting_times[2][4] = { 0 };
     // Set the number of threads to be = number of trains
@@ -303,7 +303,7 @@ int main(int argc, char *argv[])
                 {
                     // printf("~~~ Debug here ~~~  Train %d, with status: %d , with loading time %d, with station status: %d\n", i, green_trains[i].status, green_trains[i].loading_time, green_stations[green_trains[i].station]);
                     // Train is waiting on an empty station, we can start loading
-                    if (green_trains[i].status == IN_STATION && green_trains[i].loading_time == WAITING_TO_LOAD && green_stations[green_trains[i].station] == READY_TO_LOAD)
+                    if (green_trains[i].status == IN_STATION && green_trains[i].loading_time == WAITING_TO_LOAD && green_stations[green_trains[i].direction][green_trains[i].station] == READY_TO_LOAD)
                     {
                         // index_of_station = get_all_station_index(i, green_stations, all_stations_list, )
                         green_trains[i].loading_time = 2;
@@ -328,7 +328,7 @@ int main(int argc, char *argv[])
                 if (green_stations[i][j] == READY_TO_LOAD)
                 {
                     printf("Station index %d (at %d) is waiting\n", i, j);
-                    green_station_waiting_times[i][j]++;
+                    green_station_waiting_times[i][j] += 1;
                 }
             }
         }
