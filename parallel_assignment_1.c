@@ -52,9 +52,16 @@ int get_next_station(int prev_station, int direction, int num_stations);
 void free_link(int num_stations, int current_station, int next_station, char *line_stations[], char *all_stations_list[], int links_status[][8]);
 int get_all_station_index(int num_stations, int line_station_index, char *line_stations[], char *all_stations_list[]);
 int calculate_loadtime(double popularity);
+int change_train_direction(int direction);
 
 
 // FUNCTIONS
+int change_train_direction(int direction) 
+{
+    direction += 1;
+    return direction % 2;
+}
+
 void print_status(struct train_type green_trains[], int num_green_trains, char *G[])
 {
     int i;
@@ -129,14 +136,14 @@ int get_next_station(int prev_station, int direction, int num_stations)
         // Reached the end of the station
         if (prev_station == num_stations - 1)
         {
-            return prev_station - 1;
+            return prev_station;
         }
         return prev_station + 1;
     }
     // Reached the start of the station
     if (prev_station == 0)
     {
-        return 1;
+        return 0;
     }
     return prev_station - 1;
 }
@@ -324,7 +331,7 @@ int main(int argc, char *argv[])
                         {
                             // Link unoccupied, move train to the link
                             green_trains[i].transit_time = link_transit_time[current_all_station_index][next_all_station_index] - 1;
-                            printf("Transiting green train %d with transit time %d\n", i, green_trains[i].transit_time);
+                            // printf("Transiting green train %d with transit time %d\n", i, green_trains[i].transit_time);
                             green_trains[i].status = IN_TRANSIT;
                             green_trains[i].loading_time = WAITING_TO_LOAD;
                             links_status[current_all_station_index][next_all_station_index] = LINK_IS_USED;
@@ -389,14 +396,10 @@ int main(int argc, char *argv[])
                 int current_station = green_trains[i].station;
                 int next_station = get_next_station(current_station, green_trains[i].direction, num_green_stations);
                 // Get next direction based on where the train is going.
-                int next_direction;
-                if (next_station > current_station)
+                int next_direction = green_trains[i].direction;
+                if (next_station == current_station)
                 {
-                    next_direction = RIGHT;
-                }
-                else
-                {
-                    next_direction = LEFT;
+                    next_direction = change_train_direction(next_direction);
                 }
                 // Free up the link the train was on.
                 free_link(S, current_station, next_station, G, all_stations_list, links_status);
