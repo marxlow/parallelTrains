@@ -358,8 +358,9 @@ int main(int argc, char *argv[])
                 green_trains[i].direction = next_direction;
                 green_trains[i].status = IN_STATION;
                 // Update Stations
-                if (green_stations[next_station] == UNVISITED) {
-                    green_stations[next_station] = READY_TO_LOAD
+                if (green_stations[next_station] == UNVISITED) 
+                {
+                    green_stations[next_station] = READY_TO_LOAD;
                 }
             }
         }
