@@ -295,7 +295,7 @@ int main(int argc, char *argv[])
                 }
 #pragma omp critical
                 {
-                    // printf("~~~ Debug here ~~~ Train %d, with status: %d , with loading time %d, with station status: %d\n", i, green_trains[i].status, green_trains[i].loading_time, green_stations[green_trains[i].station]);
+                    // printf("~~~ Debug here ~~~  Train %d, with status: %d , with loading time %d, with station status: %d\n", i, green_trains[i].status, green_trains[i].loading_time, green_stations[green_trains[i].station]);
                     // Train is waiting on an empty station, we can start loading
                     if (green_trains[i].status == IN_STATION && green_trains[i].loading_time == WAITING_TO_LOAD && green_stations[green_trains[i].station] == READY_TO_LOAD)
                     {
@@ -349,7 +349,7 @@ int main(int argc, char *argv[])
         // Clean up stations where the loading train has just finished loading up passengers.
         for (i = 0; i < num_green_stations; i++)
         {
-            // printf("Station %d , With train index: %d, with train loading time: %d\n", i, green_stations[i], green_trains[green_stations[i]].loading_time);
+            printf("Station %d , With train index: %d, with train loading time: %d\n", i, green_stations[i], green_trains[green_stations[i]].loading_time);
             int green_train_index = green_stations[i];
             if (green_train_index >= 0)
             {
