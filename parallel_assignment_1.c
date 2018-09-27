@@ -307,7 +307,7 @@ int main(int argc, char *argv[])
 #pragma omp critical
                 {
                     // Train is waiting on an empty station, we can start loading
-                    else if (green_trains[i].loading_time == WAITING_TO_LOAD && green_stations[green_trains[i].station] == READY_TO_LOAD)
+                    if (green_trains[i].status == IN_STATION && green_trains[i].loading_time == WAITING_TO_LOAD && green_stations[green_trains[i].station] == READY_TO_LOAD)
                     {
                         // index_of_station = get_all_station_index(i, green_stations, all_stations_list, )
                         green_trains[i].loading_time = 2;
