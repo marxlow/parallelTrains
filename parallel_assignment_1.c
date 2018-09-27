@@ -45,7 +45,7 @@ struct train_type
 void print_status(struct train_type green_trains[])
 {
     int i;
-    for (i = 0; i < sizeof(green_trains) i++)
+    for (i = 0; i < sizeof(green_trains); i++)
     {
         if (green_trains[i].status == IN_STATION)
         {
@@ -363,7 +363,7 @@ int main(int argc, char *argv[])
             }
         }
         // printf("Current time tick = %d", time_tick);
-        print_status(green_trains, g);
+        print_status(green_trains);
         printf("\n\n");
     }
 
