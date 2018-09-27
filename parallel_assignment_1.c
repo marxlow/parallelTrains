@@ -45,7 +45,7 @@ struct train_type
 };
 
 // FUNCTION DECLARATIONS $$ DO NOT REMOVE.
-void print_status(struct train_type green_trains[], int num_green_trains, char *G[]);
+void print_status(struct train_type green_trains[], int num_green_trains, char *G[], int num_green_stations);
 void get_longest_shortest_average_waiting_time(int num_green_stations, int green_station_waiting_times[][4], int N, double *longest_average_waiting_time, double *shortest_average_waiting_time);
 double get_average_waiting_time(int num_green_stations, int green_station_waiting_times[][num_green_stations], int N);
 int get_next_station(int prev_station, int direction, int num_stations);
