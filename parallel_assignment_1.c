@@ -18,7 +18,7 @@
 #define LINK_IS_USED 1
 
 // Direction
-#define LEFT 0 
+#define LEFT -1 
 #define RIGHT 1
 
 // Station status
@@ -41,7 +41,7 @@ struct train_type
 };
 
 // FUNCTION DECLARATIONS $$ DO NOT REMOVE.
-void print_status(struct train_type green_trains[], int num_green_trains);
+void print_status(struct train_type green_trains[], int num_green_trains, char *G[]);
 void get_longest_shortest_average_waiting_time(int num_green_stations, int green_station_waiting_times[][4], int N, double *longest_average_waiting_time, double *shortest_average_waiting_time);
 double get_average_waiting_time(int num_green_stations, int green_station_waiting_times[][num_green_stations], int N);
 int get_next_station(int prev_station, int direction, int num_stations);
@@ -51,18 +51,20 @@ int calculate_loadtime(double popularity);
 
 
 // FUNCTIONS
-void print_status(struct train_type green_trains[], int num_green_trains)
+void print_status(struct train_type green_trains[], int num_green_trains, char *G[])
 {
     int i;
     for (i = 0; i < num_green_trains; i++)
-    {
+        {
         if (green_trains[i].status == IN_STATION)
         {
             printf("Train %d is currently in station %d | With loading time: %d \n", i, green_trains[i].station, green_trains[i].loading_time);
         }
         else if (green_trains[i].status == IN_TRANSIT)
         {
-            printf("Train %d is currently in transit | With transit time: %d \n", i, green_trains[i].transit_time);
+            int station_index = green_trains[i].station;
+            int next_station_index = station_index + green_trains[i].direction;
+            printf("Train %d is currently in transit %s->%s| With transit time: %d \n", i, G[station_index], G[next_station_index], green_trains[i].transit_time);
         }
     }
 }
@@ -129,7 +131,7 @@ int get_next_station(int prev_station, int direction, int num_stations)
     return prev_station - 1;
 }
 
-// Frees up the link
+// Frees up the link so that other trains can come onboard.
 void free_link(int num_stations, int current_station, int next_station, char *line_stations[], char *all_stations_list[], int links_status[][8])
 {
     int current_all_station_index = get_all_station_index(num_stations, current_station, line_stations, all_stations_list);
@@ -155,7 +157,8 @@ int calculate_loadtime(double popularity)
 {
     double random_number;
     random_number = (rand() % 10) + 1;
-    return round(random_number * popularity);
+    
+    return ceil(random_number * popularity);
 }
 
 
@@ -246,12 +249,11 @@ int main(int argc, char *argv[])
         printf("Current time tick = %d\n", time_tick);
         // Entering the stations 1 time tick at a time.
         int i;
-        // Boolean value to make sure that only 1 train enters the line at any t int green_station_waiting_times[4]; Time tick.
+        // Boolean value to make sure that only 1 train enters the line at any time tick.
         int introduced_train = 0;
 
 #pragma omp parallel for shared(introduced_train, green_stations, green_trains) private(i)
         // This iteration is going through all the trains in green line.
-        // As i is private, each train is handled by a single thread.
         for (i = 0; i < g; i++)
         {
             if (green_trains[i].status == NOT_IN_NETWORK)
@@ -273,10 +275,9 @@ int main(int argc, char *argv[])
                         if (green_stations[green_trains[i].direction][starting_station] == READY_TO_LOAD)
                         {
                             green_stations[green_trains[i].direction][starting_station] = i;
-                            //int current_all_station_index = get_all_station_index(starting_station, G, all_stations_list);
-                            green_trains[i].loading_time = 2;
+                            int global_station_index = get_all_station_index(S, green_trains[i].station, G, all_stations_list);
+                            green_trains[i].loading_time = calculate_loadtime(all_stations_popularity_list[global_station_index]) - 1; 
                             printf("Setting train %d as loading time %d.\n", i, green_trains[i].loading_time);
-                            //  green_trains[i].loading_time = calculate_loadtime(all_stations_popularity_list[2]) - 1;
                         }
                     }
                 }
@@ -317,6 +318,8 @@ int main(int argc, char *argv[])
                         // index_of_station = get_all_station_index(i, green_stations, all_stations_list, )
                         green_trains[i].loading_time = 2;
                         // green_trains[i].loading_time = calculate_loadtime(all_stations_popularity_list[2]) - 1;
+                        int global_station_index = get_all_station_index(S, green_trains[i].station, G, all_stations_list);
+                        green_trains[i].loading_time = calculate_loadtime(all_stations_popularity_list[global_station_index]) - 1;
                         green_stations[green_trains[i].direction][green_trains[i].station] = i;
                     }
                 }
@@ -390,7 +393,7 @@ int main(int argc, char *argv[])
                 }
             }
         }
-        print_status(green_trains, g);
+        print_status(green_trains, g, G);
         printf("\n\n");
     }
 
