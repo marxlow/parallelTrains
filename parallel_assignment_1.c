@@ -270,9 +270,13 @@ int main(int argc, char *argv[])
             }
             else if (green_trains[i].status == IN_STATION)
             {
+                // Decrement loading time and free up station if it is done loading
                 if (green_trains[i].loading_time > 0)
                 {
                     green_trains[i].loading_time--;
+                    if (green_trans[i].loading_time == 0) {
+                        green_stations[current_station] = READY_TO_LOAD;
+                    }
                 }
                 else if (green_trains[i].loading_time == FINISHED_LOADING)
                 {
@@ -295,22 +299,17 @@ int main(int argc, char *argv[])
                             printf("Transiting green train %d with transit time %d\n", i, green_trains[i].transit_time);
                             green_trains[i].status = IN_TRANSIT;
                             green_trains[i].loading_time = WAITING_TO_LOAD;
-                            // Empty up station
-                            green_stations[current_station] = READY_TO_LOAD;
                             links_status[current_all_station_index][next_all_station_index] = LINK_IS_USED;
                         }
                     }
                 }
-                else if (green_trains[i].loading_time == WAITING_TO_LOAD)
+                // Train is waiting on an empty station, we can start loading.
+                else if (green_trains[i].loading_time == WAITING_TO_LOAD && green_stations[green_trains[i].station] == READY_TO_LOAD)
                 {
-                    // This train can start loading.
-                    if (green_stations[green_trains[i].station] == READY_TO_LOAD)
-                    {
-                        //index_of_station = get_all_station_index(i, green_stations, all_stations_list, )
-                        green_trains[i].loading_time = 2;
-                        //                            green_trains[i].loading_time = calculate_loadtime(all_stations_popularity_list[2]) - 1;
-                        green_stations[green_trains[i].station] = i;
-                    }
+                    // index_of_station = get_all_station_index(i, green_stations, all_stations_list, )
+                    green_trains[i].loading_time = 2;
+                    // green_trains[i].loading_time = calculate_loadtime(all_stations_popularity_list[2]) - 1;
+                    green_stations[green_trains[i].station] = i;
                 }
             }
             else if (green_trains[i].status == IN_TRANSIT)
