@@ -399,6 +399,7 @@ int main(int argc, char *argv[])
 
         // Master thread consolidation:
         // Count the waiting times at each station.
+        #pragma omp parallel 
         printf("~~~~~ END OF ITERATION %d ~~~~\n", time_tick);
         for (i = 0; i < 2; i++) 
         {
