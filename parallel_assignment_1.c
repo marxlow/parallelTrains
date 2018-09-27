@@ -66,7 +66,7 @@ void get_longest_shortest_average_waiting_time(int num_green_stations, int green
     {
         for (j = 0; j < num_green_stations; j++) 
         {
-            double waiting_time = (double)green_station_waiting_times[i];
+            double waiting_time = (double)green_station_waiting_times[i][j];
             double station_average_waiting_time = waiting_time / (double)N;
             // Update waiting times
             if (*longest_average_waiting_time < station_average_waiting_time)
