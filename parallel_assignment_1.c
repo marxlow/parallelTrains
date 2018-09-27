@@ -308,32 +308,10 @@ int main(int argc, char *argv[])
             }
             else if (green_trains[i].status == IN_TRANSIT)
             {
-                if (green_trains[i].transit_time == 0)
-                {
-                    // Move the train to the station
-                    int current_station = green_trains[i].station;
-                    int next_station = get_next_station(current_station, green_trains[i].direction, num_green_stations);
-                    // Get next direction based on where the train is going.
-                    int next_direction;
-                    if (next_station > current_station)
-                    {
-                        next_direction = RIGHT;
-                    }
-                    else
-                    {
-                        next_direction = LEFT;
-                    }
-                    // Free up the link the train was on.
-                    free_link(current_station, next_station, G, all_stations_list, links_status);
-                    // Update Train
-                    green_trains[i].station = next_station;
-                    green_trains[i].direction = next_direction;
-                    green_trains[i].status = IN_STATION;
-                }
-                else
-                {
-                    green_trains[i].transit_time--;
-                }
+                // else
+                // {
+                green_trains[i].transit_time--;
+                // }
             }
         }
 
@@ -346,7 +324,7 @@ int main(int argc, char *argv[])
                 green_station_waiting_times[i]++;
             }
         }
-        // Clean up stations where the loading train has just finished loading up passengers.
+        // Free up stations where the loading train has just finished loading up passengers.
         for (i = 0; i < num_green_stations; i++)
         {
             printf("Station %d , With train index: %d, with train loading time: %d\n", i, green_stations[i], green_trains[green_stations[i]].loading_time);
@@ -357,6 +335,31 @@ int main(int argc, char *argv[])
                 {
                     green_stations[i] = READY_TO_LOAD;
                 }
+            }
+        }
+        // Free up links where the loading train was on
+        for (i = 0; i < num_green_trains; i ++) {
+            if (green_trains[i].status == IN_TRANSIT && green_trains[i].transit_time == 0)
+            {
+                // Move the train to the station
+                int current_station = green_trains[i].station;
+                int next_station = get_next_station(current_station, green_trains[i].direction, num_green_stations);
+                // Get next direction based on where the train is going.
+                int next_direction;
+                if (next_station > current_station)
+                {
+                    next_direction = RIGHT;
+                }
+                else
+                {
+                    next_direction = LEFT;
+                }
+                // Free up the link the train was on.
+                free_link(current_station, next_station, G, all_stations_list, links_status);
+                // Update Train
+                green_trains[i].station = next_station;
+                green_trains[i].direction = next_direction;
+                green_trains[i].status = IN_STATION;
             }
         }
         print_status(green_trains, g);
