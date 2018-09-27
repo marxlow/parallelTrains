@@ -389,7 +389,7 @@ int main(int argc, char *argv[])
     {
         for (j = 0; j < num_green_stations; j++) 
         {
-            printf("Station %d, (at %d) waiting time: %d\n", i, j, green_station_waiting_times[i][j]);
+            printf("(at %d) Station %d waiting time: %d\n", i, j, green_station_waiting_times[i][j]);
         }
     }
 
