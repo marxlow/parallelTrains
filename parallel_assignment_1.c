@@ -181,7 +181,7 @@ int main(int argc, char *argv[])
                  "tampines",
                  "downtown",
                  "harborfront"};
-    int N = 30;  // Number of time ticks in the simulation (Iterations)
+    int N = 1000;  // Number of time ticks in the simulation (Iterations)
     int g = 2;  // Number of trains in green line
     int y = 10; // Number of trains in yellow line
     int b = 10; // Number of trains in blue line
