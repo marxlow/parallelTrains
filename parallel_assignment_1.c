@@ -77,8 +77,8 @@ void print_status(struct train_type green_trains[], int num_green_trains, char *
         {
             int current_station = green_trains[i].station;
             int next_station = get_next_station(current_station, green_trains[i].direction, num_green_stations);
-            printf("Train %d is currently in transit %s->%s| With transit time: %d \n", i, G[current_station], G[next_station], green_trains[i].transit_time);
-            printf("Current train direction = %d\n", green_trains[i].direction);
+            printf("Train %d is currently in transit %s->%s | With transit time: %d \n", i, G[current_station], G[next_station], green_trains[i].transit_time);
+            // printf("Current train direction = %d\n", green_trains[i].direction);
         }
     }
 }
