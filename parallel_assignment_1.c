@@ -312,9 +312,9 @@ int main(int argc, char *argv[])
         int introduced_train_left = NOT_INTRODUCED;
         int introduced_train_right = NOT_INTRODUCED;
 
-#pragma omp parallel
+#pragma omp parallel shared(introduced_train_left, introduced_train_right, green_stations, green_trains) private(i)
     {
-#pragma omp for shared(introduced_train_left, introduced_train_right, green_stations, green_trains) private(i)
+#pragma omp for
         // This iteration is going through all the trains in green line.
         for (i = 0; i < g; i++)
         {   
