@@ -272,10 +272,6 @@ int main(int argc, char *argv[])
                 if (green_trains[i].loading_time > 0)
                 {
                     green_trains[i].loading_time--;
-                    if (green_trains[i].loading_time == 0) {
-                        int current_station = green_trains[i].station;
-                        green_stations[current_station] = READY_TO_LOAD;
-                    }
                 }
                 else if (green_trains[i].loading_time == FINISHED_LOADING)
                 {
