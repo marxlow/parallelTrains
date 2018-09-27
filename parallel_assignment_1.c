@@ -42,7 +42,7 @@ struct train_type
 
 
 // FUNCTIONS
-void print_status(struct train_type green_trains[], int sizeof(green_trains)
+void print_status(struct train_type green_trains[], int green_trains)
 {
     int i;
     for (i = 0; i < sizeof(green_trains) i++)
