@@ -301,7 +301,8 @@ int main(int argc, char *argv[])
 
     // Set the number of threads to be = number of trains
     int num_all_trains = g + y + b;
-    omp_set_num_threads(num_all_trains);
+    // TODO: Change to num_all_trains
+    omp_set_num_threads(g);
 
     int time_tick;
     for (time_tick = 0; time_tick < N; time_tick++)
