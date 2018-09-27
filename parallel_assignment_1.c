@@ -41,6 +41,109 @@ struct train_type
 };
 
 
+// FUNCTIONS
+
+void print_status(struct train_type green_trains[], int num_green_trains)
+{
+    int i;
+    for (i = 0; i < num_green_trains; i++)
+    {
+        if (green_trains[i].status == IN_STATION)
+        {
+            printf("Train %d is currently in station %d\n", i, green_trains[i].station);
+            printf("Loading time of train = %d\n", green_trains[i].loading_time);
+        }
+        else if (green_trains[i].status == IN_TRANSIT)
+        {
+            printf("Train %d is currently in transit.\n", i);
+        }
+    }
+}
+
+void get_longest_shortest_average_waiting_time(int green_station_waiting_times[], int num_green_stations, int N, double *longest_average_waiting_time, double *shortest_average_waiting_time)
+{
+    int i;
+    for (i = 0; i < num_green_stations; i++)
+    {
+        if (*longest_average_waiting_time < (double)green_station_waiting_times[i] / (double)N)
+        {
+            *longest_average_waiting_time = (double)green_station_waiting_times[i] / (double)N;
+        }
+        if (*shortest_average_waiting_time > (double)green_station_waiting_times[i] / (double)N)
+        {
+            *shortest_average_waiting_time = (double)green_station_waiting_times[i] / (double)N;
+        }
+    }
+}
+
+double get_average_waiting_time(int green_station_waiting_times[], int num_green_stations, int N)
+{
+    int i;
+    int total_waiting_time = 0;
+    for (i = 0; i < num_green_stations; i++)
+    {
+        total_waiting_time += green_station_waiting_times[i];
+    }
+    double average_waiting_time;
+    average_waiting_time = (double)total_waiting_time / (double)num_green_stations;
+    average_waiting_time = average_waiting_time / (double)N;
+    return average_waiting_time;
+}
+
+// Returns the index of the next station with the direction and previous station.
+// index: line_station index
+int get_next_station(int prev_station, int direction, int num_stations)
+{
+    if (direction == RIGHT)
+    {
+        // Reached the end of the station
+        if (prev_station == num_stations - 1)
+        {
+            return prev_station - 1;
+        }
+        return prev_station + 1;
+    }
+    // Reached the start of the station
+    if (prev_station == 0)
+    {
+        return 1;
+    }
+    return prev_station - 1;
+}
+
+// Frees up the link
+void free_link(int current_station, int next_station, char *line_stations[], char *all_stations_list[], int links_status[][8])
+{
+    int current_all_station_index = get_all_station_index(current_station, line_stations, all_stations_list);
+    int next_all_station_index = get_all_station_index(next_station, line_stations, all_stations_list);
+    links_status[current_all_station_index][next_all_station_index] = LINK_IS_EMPTY;
+}
+
+// Returns the index of a station in the "all_station_list"
+// index: all_station_list index
+int get_all_station_index(int line_station_index, char *line_stations[], char *all_stations_list[])
+{
+    const char *name = line_stations[line_station_index];
+    printf("Name of station being compared: %s\n", name);
+    // TODO: HARDCODED value of number of stations
+    for (int i = 0; i < 8; i++)
+    {
+        if (strcmp(name, all_stations_list[i]) == 0)
+        { // returns 1 if there is a match.
+            printf("Name of station being compared to: %s\n", all_stations_list[i]);
+            return i;
+        }
+    }
+}
+
+int calculate_loadtime(double popularity)
+{
+    double random_number;
+    random_number = (rand() % 10) + 1;
+    return round(random_number * popularity);
+}
+
+
 int main(int argc, char *argv[])
 {
     // NOTE: Hardcoded values from sample input
@@ -274,104 +377,4 @@ int main(int argc, char *argv[])
     double longest_average_waiting_time = 0;
     double shortest_average_waiting_time = INT_MAX;
     get_longest_shortest_average_waiting_time(green_station_waiting_times, num_green_stations, N, &longest_average_waiting_time, &shortest_average_waiting_time);
-}
-
-void print_status(struct train_type green_trains[], int num_green_trains)
-{
-    int i;
-    for (i = 0; i < num_green_trains; i++)
-    {
-        if (green_trains[i].status == IN_STATION)
-        {
-            printf("Train %d is currently in station %d\n", i, green_trains[i].station);
-            printf("Loading time of train = %d\n", green_trains[i].loading_time);
-        }
-        else if (green_trains[i].status == IN_TRANSIT)
-        {
-            printf("Train %d is currently in transit.\n", i);
-        }
-    }
-}
-
-void get_longest_shortest_average_waiting_time(int green_station_waiting_times[], int num_green_stations, int N, double *longest_average_waiting_time, double *shortest_average_waiting_time)
-{
-    int i;
-    for (i = 0; i < num_green_stations; i++)
-    {
-        if (*longest_average_waiting_time < (double)green_station_waiting_times[i] / (double)N)
-        {
-            *longest_average_waiting_time = (double)green_station_waiting_times[i] / (double)N;
-        }
-        if (*shortest_average_waiting_time > (double)green_station_waiting_times[i] / (double)N)
-        {
-            *shortest_average_waiting_time = (double)green_station_waiting_times[i] / (double)N;
-        }
-    }
-}
-
-double get_average_waiting_time(int green_station_waiting_times[], int num_green_stations, int N)
-{
-    int i;
-    int total_waiting_time = 0;
-    for (i = 0; i < num_green_stations; i++)
-    {
-        total_waiting_time += green_station_waiting_times[i];
-    }
-    double average_waiting_time;
-    average_waiting_time = (double)total_waiting_time / (double)num_green_stations;
-    average_waiting_time = average_waiting_time / (double)N;
-    return average_waiting_time;
-}
-
-// Returns the index of the next station with the direction and previous station.
-// index: line_station index
-int get_next_station(int prev_station, int direction, int num_stations)
-{
-    if (direction == RIGHT)
-    {
-        // Reached the end of the station
-        if (prev_station == num_stations - 1)
-        {
-            return prev_station - 1;
-        }
-        return prev_station + 1;
-    }
-    // Reached the start of the station
-    if (prev_station == 0)
-    {
-        return 1;
-    }
-    return prev_station - 1;
-}
-
-// Frees up the link
-void free_link(int current_station, int next_station, char *line_stations[], char *all_stations_list[], int links_status[][8])
-{
-    int current_all_station_index = get_all_station_index(current_station, line_stations, all_stations_list);
-    int next_all_station_index = get_all_station_index(next_station, line_stations, all_stations_list);
-    links_status[current_all_station_index][next_all_station_index] = LINK_IS_EMPTY;
-}
-
-// Returns the index of a station in the "all_station_list"
-// index: all_station_list index
-int get_all_station_index(int line_station_index, char *line_stations[], char *all_stations_list[])
-{
-    const char *name = line_stations[line_station_index];
-    printf("Name of station being compared: %s\n", name);
-    // TODO: HARDCODED value of number of stations
-    for (int i = 0; i < 8; i++)
-    {
-        if (strcmp(name, all_stations_list[i]) == 0)
-        { // returns 1 if there is a match.
-            printf("Name of station being compared to: %s\n", all_stations_list[i]);
-            return i;
-        }
-    }
-}
-
-int calculate_loadtime(double popularity)
-{
-    double random_number;
-    random_number = (rand() % 10) + 1;
-    return round(random_number * popularity);
 }
