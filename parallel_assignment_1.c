@@ -349,7 +349,7 @@ int main(int argc, char *argv[])
         // Clean up stations where the loading train has just finished loading up passengers.
         for (i = 0; i < num_green_stations; i++)
         {
-            printf("Station %d , With train index: %d, with train loading time: %d", i, green_stations[i], green_trains[green_stations[i]].loading_time);
+            printf("Station %d , With train index: %d, with train loading time: %d\n", i, green_stations[i], green_trains[green_stations[i]].loading_time);
             if (green_stations[i] >= 0)
             {
                 if (green_trains[green_stations[i]].loading_time == 0)
