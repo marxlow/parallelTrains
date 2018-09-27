@@ -42,7 +42,6 @@ struct train_type
 
 
 // FUNCTIONS
-
 void print_status(struct train_type green_trains[], int num_green_trains)
 {
     int i;
@@ -50,12 +49,11 @@ void print_status(struct train_type green_trains[], int num_green_trains)
     {
         if (green_trains[i].status == IN_STATION)
         {
-            printf("Train %d is currently in station %d\n", i, green_trains[i].station);
-            printf("Loading time of train = %d\n", green_trains[i].loading_time);
+            printf("Train %d is currently in station %d | With loading time: %d \n", i, green_trains[i].station, green_trains[i].loading_time);
         }
         else if (green_trains[i].status == IN_TRANSIT)
         {
-            printf("Train %d is currently in transit.\n", i);
+            printf("Train %d is currently in transit | With transit time: %d \n", i, green_trains[i].transit_time);
         }
     }
 }
@@ -285,7 +283,6 @@ int main(int argc, char *argv[])
                     int current_all_station_index = get_all_station_index(current_station, G, all_stations_list);
                     int next_station = get_next_station(current_station, green_trains[i].direction, num_green_stations);
                     int next_all_station_index = get_all_station_index(next_station, G, all_stations_list);
-                    printf("I've finished loading?\n");
 #pragma omp critical
                     {
                         // The link is currently occupied, wait in the station.
@@ -293,10 +290,6 @@ int main(int argc, char *argv[])
                         {
                             // Link unoccupied, move train to the link
                             green_trains[i].transit_time = link_transit_time[current_all_station_index][next_all_station_index] - 1;
-                            printf("Current all station_index = %d\n", current_all_station_index);
-                            printf("Next all station index = %d\n", next_all_station_index);
-                            printf("Link_transit_time = %d\n", link_transit_time[current_all_station_index][next_all_station_index]);
-
                             printf("Transiting green train %d with transit time %d\n", i, green_trains[i].transit_time);
                             green_trains[i].status = IN_TRANSIT;
                             green_trains[i].loading_time = WAITING_TO_LOAD;
