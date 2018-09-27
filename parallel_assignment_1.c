@@ -284,9 +284,9 @@ int main(int argc, char *argv[])
     }
 
     // Initialize all arrays to track waiting time at each station of each line
-    int green_station_waiting_times[2][num_green_stations] = { 0 };
-    int yellow_station_waiting_times[2][num_yellow_stations] = { 0 };
-    int blue_station_waiting_times[2][num_blue_stations] = { 0 };
+    int green_station_waiting_times[2][num_green_stations];
+    int yellow_station_waiting_times[2][num_yellow_stations];
+    int blue_station_waiting_times[2][num_blue_stations];
 
     // Set the number of threads to be = number of trains
     int num_all_trains = g + y + b;
