@@ -58,7 +58,7 @@ void print_status(struct train_type green_trains[], int num_green_trains)
     }
 }
 
-void get_longest_shortest_average_waiting_time(int green_station_waiting_times[][], int num_green_stations, int N, double *longest_average_waiting_time, double *shortest_average_waiting_time)
+void get_longest_shortest_average_waiting_time(int num_green_stations, int green_station_waiting_times[][num_green_stations], int N, double *longest_average_waiting_time, double *shortest_average_waiting_time)
 {
     int i;
     int j;
@@ -81,7 +81,7 @@ void get_longest_shortest_average_waiting_time(int green_station_waiting_times[]
     }
 }
 
-double get_average_waiting_time(int green_station_waiting_times[][], int num_green_stations, int N)
+double get_average_waiting_time(int num_green_stations, int green_station_waiting_times[][num_green_stations], int N)
 {
     int i;
     int j;
@@ -389,13 +389,13 @@ int main(int argc, char *argv[])
     {
         for (j = 0; j < num_green_stations; j++) 
         {
-            printf("Station %d, waiting time: %d\n", z, green_station_waiting_times[i][j]);
+            printf("Station %d, (at %d) waiting time: %d\n", i, j, green_station_waiting_times[i][j]);
         }
     }
 
-    double average_waiting_time = get_average_waiting_time(green_station_waiting_times, num_green_stations, N);
+    double average_waiting_time = get_average_waiting_time(num_green_stations, green_station_waiting_times, N);
     double longest_average_waiting_time = 0;
     double shortest_average_waiting_time = INT_MAX;
-    get_longest_shortest_average_waiting_time(green_station_waiting_times, num_green_stations, N, &longest_average_waiting_time, &shortest_average_waiting_time);
+    get_longest_shortest_average_waiting_time(num_green_stations, green_station_waiting_times, N, &longest_average_waiting_time, &shortest_average_waiting_time);
     printf("Average waiting time: %G | longest_average_waiting_time: %G | shortest_average_waiting_time: %G\n", average_waiting_time, longest_average_waiting_time, shortest_average_waiting_time);
 }
