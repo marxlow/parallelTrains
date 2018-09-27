@@ -1,5 +1,6 @@
 /*
-* ASSUMPTIONS: Only one train at a time can load at a station
+333             printf("Name of station being compared to: %s\n", all_stations_list[i]);
+ * ASSUMPTIONS: Only one train at a time can load at a station
 */
 #include <omp.h>
 #include <stdio.h>
@@ -24,6 +25,7 @@
 // Station status
 #define READY_TO_LOAD -1
 #define UNVISITED -2
+#define VISITED 1
 #define LOADING 0
 
 // Loading status
@@ -39,7 +41,8 @@ struct train_type
     int transit_time;   // -1 for NA | > 0 for in transit
 };
 
-void get_longest_shortest_average_waiting_time(int green_station_waiting_times[], int num_green_stations, int N, double *longest_average_waiting_time, double *shortest_average_waiting_time);
+vme of station being compared to: %s\n", all_stations_list[i]);
+oid get_longest_shortest_average_waiting_time(int green_station_waiting_times[], int num_green_stations, int N, double *longest_average_waiting_time, double *shortest_average_waiting_time);
 double get_average_waiting_time(int green_station_waiting_times[], int num_green_stations, int N);
 int get_next_station(int prev_station, int direction, int num_stations);
 void free_link(int current_situation, int next_station, char *line_stations[], char *all_stations_list[], int links_status[][8]);
@@ -93,7 +96,7 @@ int main(int argc, char *argv[])
         "downtown",
         "harborfront"
     };
-    int N = 2;                  // Number of time ticks in the simulation (Iterations)
+    int N = 5;                  // Number of time ticks in the simulation (Iterations)
     int g = 4;                  // Number of trains in green line
     int y = 10;                  // Number of trains in yellow line
     int b = 10;                  // Number of trains in blue line
@@ -108,43 +111,45 @@ int main(int argc, char *argv[])
     for (i = 0; i < 8; i++) {
         for (j = 0; j < 8; j++) {
             links_status[i][j] = LINK_IS_EMPTY;
-	}
+	    }
     }
 
     struct train_type green_trains[4] = {
-        {0, -1, -1, -1, -1},
-        {0, -1, -1, -1, -1},
-        {0, -1, -1, -1, -1},
-        {0, -1, -1, -1, -1}
+        {WAITING_TO_LOAD, NOT_IN_NETWORK, 1, -1, -1},
+        {WAITING_TO_LOAD, NOT_IN_NETWORK, 1, -1, -1},
+        {WAITING_TO_LOAD, NOT_IN_NETWORK, 1, -1, -1},
+        {WAITING_TO_LOAD, NOT_IN_NETWORK, 1, -1, -1}
     };
 
     // TODO: Programmatically find the number of stations in the green line.
     // -2 : unvisited
     // -1 : not loading
-                        green_trains[i].status = IN_STATION;
+    green_trains[i].status = IN_STATION;
     // >= 0: index of loading train
     int num_green_stations = 4;
-    int green_stations[4] = {UNVISITED, UNVISITED, UNVISITED, UNVISITED};
+    int green_stations[4] = {READY_TO_LOAD, READY_TO_LOAD, READY_TO_LOAD, READY_TO_LOAD};
+    // This array is to make sure that we only start counting wait times after a train station has been visited.
+    int green_stations_visited[4] = {UNVISITED, UNVISITED, UNVISITED, UNVISITED};
+    // This array is to keep track of the overall waiting times at EACH station.
     int green_station_waiting_times[4];
     for (i = 0 ; i < num_green_stations; i++) {
-        green_station_waiting_times[i] = 0;
+        green_station_waiting_times[i] = 0; 
     }
     // Set the number of threads to be = number of trains
     omp_set_num_threads(g);
 
     int time_tick;
     for (time_tick = 0 ; time_tick < N; time_tick++) {
+        printf("Current time tick = %d\n", time_tick);
         // Entering the stations 1 time tick at a time.
         int i;
-        // Boolean value to make sure that only 1 train enters the line at any time tick.
+        // Boolean value to make sure that only 1 train enters the line at any t int green_station_waiting_times[4];ime tick.
         int introduced_train = 0;
 
-        #pragma omp parallel shared(introduced_train, green_stations, green_trains) private(i)
-        {
+        #pragma omp parallel for shared(introduced_train, green_stations, green_stations_visited, green_trains) private(i)        
             // This iteration is going through all the trains in green line.
             // As i is private, each train is handled by a single thread.
             for (i = 0; i < g; i++) {
-		printf("Thread num %d\n", omp_get_thread_num());
                 if (green_trains[i].status == NOT_IN_NETWORK) {
                     #pragma omp critical
                     {
@@ -155,12 +160,17 @@ int main(int argc, char *argv[])
                         introduced_train = 1;
                         green_trains[i].status = IN_STATION;
                         green_trains[i].station = starting_station;
+                        if (green_stations_visited[starting_station] == UNVISITED) {
+                            green_stations_visited[starting_station] = VISITED;
+                        } 
+
                         // If no trains are loading. We will start loading the introduced train immediately.
                         if (green_stations[starting_station] == READY_TO_LOAD) {
                             green_stations[starting_station] = LOADING;
-			    int current_all_station_index = get_all_station_index(starting_station, G, all_stations_list);
-			    green_trains[i].loading_time = 5;	
-			//  green_trains[i].loading_time = calculate_loadtime(all_stations_popularity_list[2]) - 1;
+			                //int current_all_station_index = get_all_station_index(starting_station, G, all_stations_list);
+			                green_trains[i].loading_time = 2;
+                            printf("Setting train %d as loading time %d.\n", i, green_trains[i].loading_time);    
+			                //  green_trains[i].loading_time = calculate_loadtime(all_stations_popularity_list[2]) - 1;
                         }
                     }
                     }
@@ -168,18 +178,23 @@ int main(int argc, char *argv[])
                 } else if (green_trains[i].status == IN_STATION) {
                     if (green_trains[i].loading_time > 0) {
                         green_trains[i].loading_time--;
-			printf("I don't think so right?\n");
                     } else if (green_trains[i].loading_time == FINISHED_LOADING) {
                         int current_station = green_trains[i].station;
                         int current_all_station_index = get_all_station_index(current_station, G, all_stations_list);
                         int next_station = get_next_station(current_station, green_trains[i].direction, num_green_stations);
                         int next_all_station_index = get_all_station_index(next_station, G, all_stations_list);
+                        printf("I've finished loading?\n");
                         #pragma omp critical
                         {
                             // The link is currently occupied, wait in the station.
                             if (links_status[current_all_station_index][next_all_station_index] == LINK_IS_EMPTY ) {
                                 // Link unoccupied, move train to the link
                                 green_trains[i].transit_time = link_transit_time[current_all_station_index][next_all_station_index] - 1;
+                                printf("Current all station_index = %d\n", current_all_station_index);
+                                printf("Next all station index = %d\n", next_all_station_index);
+                                printf("Link_transit_time = %d\n", link_transit_time[current_all_station_index][next_all_station_index]);
+
+                                printf("Transiting green train %d with transit time %d\n", i, green_trains[i].transit_time);
                                 green_trains[i].status = IN_TRANSIT;
                                 green_trains[i].loading_time = WAITING_TO_LOAD;
                                 // Empty up station
@@ -192,12 +207,13 @@ int main(int argc, char *argv[])
                         // This train can start loading.
                         if (green_stations[green_trains[i].station] == READY_TO_LOAD) {
                             //index_of_station = get_all_station_index(i, green_stations, all_stations_list, )
-			    green_trains[i].loading_time = 5;
+			                green_trains[i].loading_time = 2;
 //                            green_trains[i].loading_time = calculate_loadtime(all_stations_popularity_list[2]) - 1;
                             green_stations[green_trains[i].station] = i;
                         }
                     }
                 } else if (green_trains[i].status == IN_TRANSIT) {
+                    printf("Train %d in transit has a transit time of %d left.\n", i, green_trains[i].transit_time);
                     if (green_trains[i].transit_time == 0) {
                         // Move the train to the station
                         int current_station = green_trains[i].station;
@@ -219,8 +235,8 @@ int main(int argc, char *argv[])
                         green_trains[i].transit_time--;
                     }
                 }
-            }
         }
+        
         // Master thread consolidation:
         // Count the waiting times at each station.
         for (i = 0 ; i < num_green_stations; i++) {
@@ -236,8 +252,9 @@ int main(int argc, char *argv[])
                 }
             }
         }
-        printf("Current time tick = %d\n", time_tick);
+        // printf("Current time tick = %d", time_tick);
         print_status(green_trains, g);
+        printf("\n\n");
     }
     
     double average_waiting_time = get_average_waiting_time(green_station_waiting_times, num_green_stations, N);
@@ -311,9 +328,11 @@ void free_link(int current_station, int next_station, char *line_stations[], cha
 // index: all_station_list index
 int get_all_station_index(int line_station_index, char *line_stations[], char *all_stations_list[]) {
     const char *name = line_stations[line_station_index];
+    printf("Name of station being compared: %s\n", name);
     // TODO: HARDCODED value of number of stations
     for (int i = 0; i < 8; i ++) {
         if (strcmp(name, all_stations_list[i]) == 1) { // returns 1 if there is a match.
+            printf("Name of station being compared to: %s\n", all_stations_list[i]);
             return i;
         }
     }
@@ -323,4 +342,4 @@ int calculate_loadtime(double popularity) {
     double random_number;
     random_number = (rand() % 10) + 1;
     return round(random_number * popularity);
-}
+ementii
