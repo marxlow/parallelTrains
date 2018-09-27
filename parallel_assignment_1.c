@@ -317,17 +317,19 @@ int main(int argc, char *argv[])
 
         // Master thread consolidation:
         // Count the waiting times at each station.
+        printf("~~~~~ END OF ITERATION ~~~~\n");
         for (i = 0; i < num_green_stations; i++)
         {
             if (green_stations[i] == READY_TO_LOAD)
             {
+                printf("Station %d is waiting\n", i)
                 green_station_waiting_times[i]++;
             }
         }
         // Free up stations where the loading train has just finished loading up passengers.
         for (i = 0; i < num_green_stations; i++)
         {
-            printf("Station %d , With train index: %d, with train loading time: %d\n", i, green_stations[i], green_trains[green_stations[i]].loading_time);
+            // printf("Station %d , With train index: %d, with train loading time: %d\n", i, green_stations[i], green_trains[green_stations[i]].loading_time);
             int green_train_index = green_stations[i];
             if (green_train_index >= 0)
             {
