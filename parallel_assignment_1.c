@@ -62,7 +62,7 @@ int change_train_direction(int direction)
     return direction % 2;
 }
 
-void print_status(struct train_type green_trains[], int num_green_trains, char *G[])
+void print_status(struct train_type green_trains[], int num_green_trains, char *G[], int num_green_stations)
 {
     int i;
     for (i = 0; i < num_green_trains; i++)
@@ -413,7 +413,7 @@ int main(int argc, char *argv[])
                 }
             }
         }
-        print_status(green_trains, g, G);
+        print_status(green_trains, g, G, num_green_stations);
         printf("\n\n");
     }
 
