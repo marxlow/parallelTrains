@@ -312,6 +312,7 @@ int main(int argc, char *argv[])
         // Boolean value to make sure that only 1 train enters the line at any time tick.
         int introduced_train_left = NOT_INTRODUCED;
         int introduced_train_right = NOT_INTRODUCED;
+        // Count the number of idle trains at the start of each iteration. Since READY_TO_LOAD will only be accurately updated after each iteration
         for (i = 0; i < 2; i++) 
         {
             char *c;
