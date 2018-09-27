@@ -370,4 +370,5 @@ int main(int argc, char *argv[])
     double longest_average_waiting_time = 0;
     double shortest_average_waiting_time = INT_MAX;
     get_longest_shortest_average_waiting_time(green_station_waiting_times, num_green_stations, N, &longest_average_waiting_time, &shortest_average_waiting_time);
+    printf("Average waiting time: %G | longest_average_waiting_time: %G | shortest_average_waiting_time: %G", average_waiting_time, longest_average_waiting_time, shortest_average_waiting_time);
 }
