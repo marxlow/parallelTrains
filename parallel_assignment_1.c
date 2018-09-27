@@ -306,7 +306,6 @@ int main(int argc, char *argv[])
     int time_tick;
     for (time_tick = 0; time_tick < N; time_tick++)
     {
-        printf("Current time tick = %d\n", time_tick);
         // Entering the stations 1 time tick at a time.
         int i;
         // Boolean value to make sure that only 1 train enters the line at any time tick.
@@ -400,7 +399,7 @@ int main(int argc, char *argv[])
 
         // Master thread consolidation:
         // Count the waiting times at each station.
-        printf("~~~~~ END OF ITERATION ~~~~\n");
+        printf("~~~~~ END OF ITERATION %d ~~~~\n", time_tick);
         for (i = 0; i < 2; i++) 
         {
             char *c;
