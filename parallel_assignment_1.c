@@ -312,7 +312,23 @@ int main(int argc, char *argv[])
         // Boolean value to make sure that only 1 train enters the line at any time tick.
         int introduced_train_left = NOT_INTRODUCED;
         int introduced_train_right = NOT_INTRODUCED;
-
+        for (i = 0; i < 2; i++) 
+        {
+            char *c;
+            if (i == 0) {
+                c = "left";
+            } else {
+                c = "right";
+            }
+            for (j = 0; j < num_green_stations; j++)
+            {
+                if (green_stations[i][j] == READY_TO_LOAD)
+                {
+                    printf("(%s) Station %d is waiting\n", c, j);
+                    green_station_waiting_times[i][j] += 1;
+                }
+            }
+        }
 #pragma omp parallel for shared(introduced_train_left, introduced_train_right, green_stations, green_trains) private(i)
         // This iteration is going through all the trains in green line.
         for (i = 0; i < g; i++)
@@ -400,26 +416,7 @@ int main(int argc, char *argv[])
 
         // Master thread consolidation:
         // Count the waiting times at each station.
-#pragma omp barrier
         printf("~~~~~ END OF ITERATION %d ~~~~\n", time_tick);
-        for (i = 0; i < 2; i++) 
-        {
-            char *c;
-            if (i == 0) {
-                c = "left";
-            } else {
-                c = "right";
-            }
-            for (j = 0; j < num_green_stations; j++)
-            {
-                if (green_stations[i][j] == READY_TO_LOAD)
-                {
-                    printf("(%s) Station %d is waiting\n", c, j);
-                    green_station_waiting_times[i][j] += 1;
-                }
-            }
-        }
-
         // Free up stations where the loading train has just finished loading up passengers.
         for (i = 0; i < 2; i ++)
         {
