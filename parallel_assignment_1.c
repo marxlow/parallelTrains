@@ -352,7 +352,7 @@ int main(int argc, char *argv[])
             {
                 if (green_trains[green_stations[i]].loading_time == 0)
                 {
-                    green_stations[i] == WAITING_TO_LOAD;
+                    green_stations[i] == READY_TO_LOAD;
                 }
             }
         }
