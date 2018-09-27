@@ -42,10 +42,10 @@ struct train_type
 
 
 // FUNCTIONS
-void print_status(struct train_type green_trains[], int num_green_trains)
+void print_status(struct train_type green_trains[], int sizeof(green_trains)
 {
     int i;
-    for (i = 0; i < num_green_trains; i++)
+    for (i = 0; i < sizeof(green_trains) i++)
     {
         if (green_trains[i].status == IN_STATION)
         {
@@ -181,7 +181,7 @@ int main(int argc, char *argv[])
                  "tampines",
                  "downtown",
                  "harborfront"};
-    int N = 5;  // Number of time ticks in the simulation (Iterations)
+    int N = 10;  // Number of time ticks in the simulation (Iterations)
     int g = 4;  // Number of trains in green line
     int y = 10; // Number of trains in yellow line
     int b = 10; // Number of trains in blue line
@@ -231,13 +231,14 @@ int main(int argc, char *argv[])
         int i;
         // Boolean value to make sure that only 1 train enters the line at any t int green_station_waiting_times[4];ime tick.
         int introduced_train = 0;
+        int num_introduced_trains = 0;
 
 #pragma omp parallel for shared(introduced_train, green_stations, green_stations_visited, green_trains) private(i)
         // This iteration is going through all the trains in green line.
         // As i is private, each train is handled by a single thread.
         for (i = 0; i < g; i++)
         {
-            if (green_trains[i].status == NOT_IN_NETWORK)
+            if (green_trains[i].status == NOT_IN_NETWORK && num_introduced_trains < sizeof(green_trains))
             {
 #pragma omp critical
                 {
@@ -247,6 +248,7 @@ int main(int argc, char *argv[])
                         int starting_station = 0;
                         // Introduce the train to the network and update.
                         introduced_train = 1;
+                        num_introduced_trains += 1;
                         green_trains[i].status = IN_STATION;
                         green_trains[i].station = starting_station;
                         if (green_stations_visited[starting_station] == UNVISITED)
