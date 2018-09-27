@@ -18,7 +18,7 @@
 #define LINK_IS_USED 1
 
 // Direction
-#define LEFT -1 
+#define LEFT 0 
 #define RIGHT 1
 
 // Station status
@@ -30,6 +30,10 @@
 // Loading status
 #define WAITING_TO_LOAD -1
 #define FINISHED_LOADING 0
+
+// Introducing trains into the network
+#define INTRODUCED 1
+#define NOT_INTRODUCED 0
 
 struct train_type
 {
@@ -63,7 +67,12 @@ void print_status(struct train_type green_trains[], int num_green_trains, char *
         else if (green_trains[i].status == IN_TRANSIT)
         {
             int station_index = green_trains[i].station;
-            int next_station_index = station_index + green_trains[i].direction;
+            int next_station_index;
+            if (green_trains[i].direction == LEFT) {
+                next_station_index = station_index - 1;
+            } else {
+                next_station_index = station_index + 1;
+            }
             printf("Train %d is currently in transit %s->%s| With transit time: %d \n", i, G[station_index], G[next_station_index], green_trains[i].transit_time);
         }
     }
@@ -250,22 +259,34 @@ int main(int argc, char *argv[])
         // Entering the stations 1 time tick at a time.
         int i;
         // Boolean value to make sure that only 1 train enters the line at any time tick.
-        int introduced_train = 0;
+        int introduced_train_left = NOT_INTRODUCED;
+        int introduced_train_right = NOT_INTRODUCED;
 
-#pragma omp parallel for shared(introduced_train, green_stations, green_trains) private(i)
+#pragma omp parallel for shared(introduced_train_left, introduced_train_right, green_stations, green_trains) private(i)
         // This iteration is going through all the trains in green line.
         for (i = 0; i < g; i++)
-        {
+        {   
             if (green_trains[i].status == NOT_IN_NETWORK)
             {
-#pragma omp critical
+                #pragma omp critical
                 {
-                    if (introduced_train == 0)
+                    int starting_station = -1;
+                    if (introduced_train_right == NOT_INTRODUCED) {
+                        starting_station = 0;
+                    } else if (introduced_train_left == NOT_INTRODUCED) {
+                        starting_station = num_green_stations - 1;
+                    }  
+
+                    // Introducing a train into the network.
+                    if (starting_station != -1)
                     {
-                        // TODO: starting station should alternate between ends of a line
-                        int starting_station = 0;
-                        // Introduce the train to the network and update.
-                        introduced_train = 1;
+                        if (starting_station == 0) {
+                            introduced_train_right = INTRODUCED;
+                            green_trains[i].direction = RIGHT;        
+                        } else {
+                            introduced_train_left = INTRODUCED;
+                            green_trains[i].direction = LEFT;
+                        }
                         green_trains[i].status = IN_STATION;
                         green_trains[i].station = starting_station;
                         if (green_stations[green_trains[i].direction][starting_station] == UNVISITED) {
@@ -295,7 +316,7 @@ int main(int argc, char *argv[])
                     int current_all_station_index = get_all_station_index(S, current_station, G, all_stations_list);
                     int next_station = get_next_station(current_station, green_trains[i].direction, num_green_stations);
                     int next_all_station_index = get_all_station_index(S, next_station, G, all_stations_list);
-#pragma omp critical
+                    #pragma omp critical
                     {
                         // The link is currently occupied, wait in the station.
                         if (links_status[current_all_station_index][next_all_station_index] == LINK_IS_EMPTY)
@@ -309,15 +330,11 @@ int main(int argc, char *argv[])
                         }
                     }
                 }
-#pragma omp critical
+                #pragma omp critical
                 {
-                    // printf("~~~ Debug here ~~~  Train %d, with status: %d , with loading time %d, with station status: %d\n", i, green_trains[i].status, green_trains[i].loading_time, green_stations[green_trains[i].station]);
                     // Train is waiting on an empty station, we can start loading
                     if (green_trains[i].status == IN_STATION && green_trains[i].loading_time == WAITING_TO_LOAD && green_stations[green_trains[i].direction][green_trains[i].station] == READY_TO_LOAD)
                     {
-                        // index_of_station = get_all_station_index(i, green_stations, all_stations_list, )
-                        green_trains[i].loading_time = 2;
-                        // green_trains[i].loading_time = calculate_loadtime(all_stations_popularity_list[2]) - 1;
                         int global_station_index = get_all_station_index(S, green_trains[i].station, G, all_stations_list);
                         green_trains[i].loading_time = calculate_loadtime(all_stations_popularity_list[global_station_index]) - 1;
                         green_stations[green_trains[i].direction][green_trains[i].station] = i;
