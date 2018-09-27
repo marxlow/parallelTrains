@@ -311,7 +311,6 @@ int main(int argc, char *argv[])
             }
             else if (green_trains[i].status == IN_TRANSIT)
             {
-                printf("Train %d in transit has a transit time of %d left.\n", i, green_trains[i].transit_time);
                 if (green_trains[i].transit_time == 0)
                 {
                     // Move the train to the station
