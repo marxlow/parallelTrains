@@ -241,17 +241,18 @@ int main(int argc, char *argv[])
     struct train_type green_trains[g];
     struct train_type yellow_trains[y];
     struct train_type blue_trains[b];
+    struct train_type initial_train = {WAITING_TO_LOAD, NOT_IN_NETWORK, RIGHT, -1, -1};
     for (i = 0; i < g; i ++) 
     {
-        green_trains[i] = {WAITING_TO_LOAD, NOT_IN_NETWORK, RIGHT, -1, -1};
+        green_trains[i] = initial_train;
     }
     for (i = 0; i < y; i ++) 
     {
-        yellow_trains[i] = {WAITING_TO_LOAD, NOT_IN_NETWORK, RIGHT, -1, -1};
+        yellow_trains[i] = initial_train;
     }
     for (i = 0; i < b; i ++) 
     {
-        blue_trains[i] = {WAITING_TO_LOAD, NOT_IN_NETWORK, RIGHT, -1, -1};
+        blue_trains[i] = initial_train;
     }
 
     // Initialize all stations. -2 : unvisited | -1 : not loading | >= 0: index of loading train
