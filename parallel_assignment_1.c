@@ -212,10 +212,10 @@ int main(int argc, char *argv[])
     }
 
     struct train_type green_trains[4] = {
-        {WAITING_TO_LOAD, NOT_IN_NETWORK, 1, -1, -1},
-        {WAITING_TO_LOAD, NOT_IN_NETWORK, 1, -1, -1},
-        {WAITING_TO_LOAD, NOT_IN_NETWORK, 1, -1, -1},
-        {WAITING_TO_LOAD, NOT_IN_NETWORK, 1, -1, -1}};
+        {WAITING_TO_LOAD, NOT_IN_NETWORK, RIGHT, -1, -1},
+        {WAITING_TO_LOAD, NOT_IN_NETWORK, RIGHT, -1, -1},
+        {WAITING_TO_LOAD, NOT_IN_NETWORK, RIGHT, -1, -1},
+        {WAITING_TO_LOAD, NOT_IN_NETWORK, RIGHT, -1, -1}};
 
     // TODO: Programmatically find the number of stations in the green line.
     // -2 : unvisited
