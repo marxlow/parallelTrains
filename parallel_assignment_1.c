@@ -211,7 +211,7 @@ int main(int argc, char *argv[])
     // -1 : not loading
     // >= 0: index of loading train
     int num_green_stations = 4;
-    int green_stations[4] = {READY_TO_LOAD, READY_TO_LOAD, READY_TO_LOAD, READY_TO_LOAD};
+    int green_stations[4] = {UNVISITED, UNVISITED, UNVISITED, UNVISITED};
     // This array is to make sure that we only start counting wait times after a train station has been visited.
     int green_stations_visited[4] = {UNVISITED, UNVISITED, UNVISITED, UNVISITED};
     // This array is to keep track of the overall waiting times at EACH station.
@@ -249,11 +249,9 @@ int main(int argc, char *argv[])
                         introduced_train = 1;
                         green_trains[i].status = IN_STATION;
                         green_trains[i].station = starting_station;
-                        if (green_stations_visited[starting_station] == UNVISITED)
-                        {
-                            green_stations_visited[starting_station] = VISITED;
+                        if (green_stations[starting_station] == UNVISITED) {
+                            green_stations[starting_station] = READY_TO_LOAD;
                         }
-
                         // If no trains are loading. We will start loading the introduced train immediately.
                         if (green_stations[starting_station] == READY_TO_LOAD)
                         {
@@ -308,10 +306,7 @@ int main(int argc, char *argv[])
             }
             else if (green_trains[i].status == IN_TRANSIT)
             {
-                // else
-                // {
                 green_trains[i].transit_time--;
-                // }
             }
         }
 
@@ -362,6 +357,10 @@ int main(int argc, char *argv[])
                 green_trains[i].station = next_station;
                 green_trains[i].direction = next_direction;
                 green_trains[i].status = IN_STATION;
+                // Update Stations
+                if (green_stations[next_station] == UNVISITED) {
+                    green_stations[next_station] = READY_TO_LOAD
+                }
             }
         }
         print_status(green_trains, g);
