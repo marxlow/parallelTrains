@@ -59,7 +59,7 @@ void introduce_train_into_network(struct train_type *train, double all_stations_
 void in_station_action(struct train_type *train, int train_number, int S, char *line_stations_name_list[], int **line_stations, char *all_stations_list[], int num_stations, double all_stations_popularity_list[], int **link_transit_time, int **links_status);
 void in_transit_action(struct train_type *train, int num_stations, int S, int **line_stations, char* line_stations_name_list[], char *all_stations_list[], int **links_status_update);
 void update_train_stations(int direction_index, int num_stations, int **train_stations, struct train_type trains[]);
-void update_links_status(int **links_status_update, int **links_status, int S;
+void update_links_status(int **links_status_update, int **links_status, int S);
 
 // Function declaration: Calculating waiting time
 double get_average_waiting_time(int num_green_stations, int **green_station_waiting_times, int N);
@@ -114,16 +114,17 @@ void in_station_action(struct train_type *train, int train_number, int S, char *
         int current_all_station_index = get_all_station_index(S, current_station, line_stations_name_list, all_stations_list);
         int next_station = get_next_station(current_station, train->direction, num_stations);
         int next_all_station_index = get_all_station_index(S, next_station, line_stations_name_list, all_stations_list);
-        // TODO: CRITICAL SECTION?
         // Link is not occupied, move train into link.
-        //printf("The link here is: links_status[%d][%d] = %d", current_all_station_index, next_all_station_index, links_status[current_all_station_index][next_all_station_index]);
-        
-        if (links_status[current_all_station_index][next_all_station_index] == LINK_IS_EMPTY) {
-            train->transit_time = link_transit_time[current_all_station_index][next_all_station_index] - 1;
-            train->status = IN_TRANSIT;
-            train->loading_time = WAITING_TO_LOAD;
-            links_status[current_all_station_index][next_all_station_index] = LINK_IS_USED;
+        #pragma omp critical 
+        {
+            if (links_status[current_all_station_index][next_all_station_index] == LINK_IS_EMPTY) {
+                    train->transit_time = link_transit_time[current_all_station_index][next_all_station_index] - 1;
+                    train->status = IN_TRANSIT;
+                    train->loading_time = WAITING_TO_LOAD;
+                    links_status[current_all_station_index][next_all_station_index] = LINK_IS_USED;
+                }
         }
+ 
     }
     // Load a waiting train
     if (train->status == IN_STATION && train->loading_time == WAITING_TO_LOAD && line_stations[train->direction][train->station] == READY_TO_LOAD) {
@@ -643,10 +644,7 @@ int main(int argc, char *argv[]) {
                 }
             }
             else if (trains[i].status == IN_STATION) {
-                #pragma omp critical 
-                {
-                    in_station_action(&trains[i], i, S, line_stations_name_list, line_stations, all_stations_list, num_stations, all_stations_popularity_list, link_transit_time, links_status);
-                }
+                in_station_action(&trains[i], i, S, line_stations_name_list, line_stations, all_stations_list, num_stations, all_stations_popularity_list, link_transit_time, links_status);
             }
             else if (trains[i].status == IN_TRANSIT) {
                 in_transit_action(&trains[i], num_stations, S, line_stations, line_stations_name_list, all_stations_list, links_status_update);
