@@ -304,52 +304,111 @@ int main(int argc, char *argv[]) {
     int i;
     int j;
     int k;
-    // TODO: READ VALUES FROM INPUT INSTEAD.
-    int S = 8;                   // Number of train stations in the network
-    char *all_stations_list[] = {// List of stations
-                                 "changi",
-                                 "tampines",
-                                 "clementi",
-                                 "downtown",
-                                 "chinatown",
-                                 "harborfront",
-                                 "bedok",
-                                 "tuas"};
-    
-    int *link_transit_time[8]; // Transit time of a link from station(row) to another station(col)
-    for (i = 0; i < 8; i++) {
-        link_transit_time[i] = (int*)malloc(8 * sizeof(int));
+
+    //---------------------------- PARSING INPUT FROM THE INPUT FILE. -------------------------------//
+    char c[1000];
+    FILE *fptr;
+    if ((fptr = fopen("input.txt", "r")) == NULL)
+    {
+        printf("Error! opening file");
+        // Program exits if file pointer returns NULL.
+        exit(1);         
     }
-    link_transit_time[0] = (int[8]){0, 3, 0, 0, 0, 0, 0, 0};
-    link_transit_time[1] = (int[8]){3, 0, 8, 6, 0, 2, 0, 0};
-    link_transit_time[2] = (int[8]){0, 8, 0, 0, 4, 0, 0, 5};
-    link_transit_time[3] = (int[8]){0, 6, 0, 0, 0, 9, 0, 0};
-    link_transit_time[4] = (int[8]){0, 0, 4, 0, 0, 0, 10, 0};
-    link_transit_time[5] = (int[8]){0, 2, 0, 9, 0, 0, 0, 0};
-    link_transit_time[6] = (int[8]){0, 0, 0, 0, 10, 0, 0, 0};
-    link_transit_time[7] = (int[8]){0, 0, 5, 0, 0, 0, 0, 0};
-    double all_stations_popularity_list[8] = {
-        0.9, 0.5, 0.2, 0.3, 0.7, 0.8, 0.4, 0.1};
-    char *G[] = {// Stations in the green line
-                 "tuas",
-                 "clementi",
-                 "tampines",
-                 "changi"};
-    char *Y[] = {// Stations in the yellow line
-                 "bedok",
-                 "chinatown",
-                 "clementi",
-                 "tampines",
-                 "harborfront"};
-    char *B[] = {// Stations in the blue line
-                 "changi",
-                 "tampines",
-                 "downtown",
-                 "harborfront"};
-    int N = 100;  // Number of time ticks in the simulation (Iterations)
-    int g = 10;  // Number of trains in green line
-    int y = 10; // Number of trains in yellow line
-    int b = 10; // Number of trains in blue line
+    fgets(c, 1000, fptr);
+    int S = atoi(c);
+
+    fgets(c, 1000, fptr);
+    printf("%s", c);
+    char *all_stations_list[S];
+    const char delimiter[2] = ",";
+    char *station;
+    station = strtok(c, delimiter);
+    for (i = 0 ; i < S; i++) {
+        all_stations_list[i] = station;
+        station = strtok(NULL, delimiter);
+    }
+
+    // S x S matrix denoting the link transit time.
+    int *link_transit_time[S];
+    for (i = 0 ; i < S; i++) {
+        link_transit_time[i] = (int*)malloc(S * sizeof(int));
+    }
+    const char space_delimiter[2] = " ";
+    char *value;
+    int int_value;
+    // fgets S number of times.
+    for (i = 0 ; i < S; i++) {
+        fgets(c, 1000, fptr);
+        value = strtok(c, space_delimiter);
+        int_value = atoi(value);
+        for (j = 0 ; j < S; j++) {
+            int_value = atoi(value);
+            link_transit_time[i][j] = int_value;
+            value = strtok(NULL, space_delimiter);
+        }
+    }
+    
+    // POPULARITY LIST.
+    double *all_stations_popularity_list = malloc(S * sizeof(double));
+    double double_value;
+    fgets(c, 1000, fptr);
+    value = strtok(c, space_delimiter);
+    sscanf(value, "%lf", &double_value);
+    for (i = 0 ; i < S; i++) {
+        sscanf(value, "%lf", &double_value);
+        all_stations_popularity_list[i] = double_value;
+        value = strtok(NULL, space_delimiter);
+    }
+    
+    // GREEN TRAIN STATION LIST.
+    char *G[S];
+    fgets(c, 1000, fptr);
+    station = strtok(c, delimiter);
+    i = 0;
+    int num_green_stations = 0;
+    while (station != NULL){
+        G[num_green_stations] = station;
+        num_green_stations++;
+        station = strtok(NULL, delimiter);
+    }
+
+    // BLUE TRAIN STATION LIST
+    char *B[S];
+    fgets(c, 1000, fptr);
+    station = strtok(c, delimiter);
+    int num_blue_stations = 0;
+    while (station != NULL){
+        B[num_blue_stations] = station;
+        num_blue_stations++;
+        station = strtok(NULL, delimiter);
+    }
+
+    // YELLOW TRAIN STATION LIST
+    char *Y[S];
+    fgets(c, 1000, fptr);
+    station = strtok(c, delimiter);
+    int num_yellow_stations = 0;
+    while (station != NULL){
+        Y[num_yellow_stations] = station;
+        num_yellow_stations++;
+        station = strtok(NULL, delimiter);
+    }
+
+    fgets(c, 1000, fptr);
+    int N = atoi(c); 
+
+    fgets(c, 1000, fptr);
+    strtok(c, delimiter);
+    int g = atoi(c);
+    strtok(NULL, delimiter);
+    int y = atoi(c);
+    strtok(NULL, delimiter);
+    int b = atoi(c);
+
+    fclose(fptr);
+
+    //---------------------------- PARSING INPUT FROM THE INPUT FILE. -------------------------------//
+
 
     // Initialize Link status. -1: Link is empty | 1: Link is used
     int *links_status[8];
@@ -378,9 +437,9 @@ int main(int argc, char *argv[]) {
         trains[i] = initial_blue_train;
     }
 
-    int num_green_stations = sizeof(G) / sizeof(G[0]);
-    int num_yellow_stations = sizeof(Y) / sizeof(Y[0]);
-    int num_blue_stations = sizeof(B) / sizeof(B[0]);
+    //int num_green_stations = sizeof(G) / sizeof(G[0]);
+    //int num_yellow_stations = sizeof(Y) / sizeof(Y[0]);
+    //int num_blue_stations = sizeof(B) / sizeof(B[0]);
     // INITIALISATION of arrays that keep track of the status of EACH station on EACH line in EACH direction.
     // If a station is occupied, it will store the GLOBAL INDEX of the train from the trains array.
     int *green_stations[2];
