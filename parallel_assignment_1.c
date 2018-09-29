@@ -59,7 +59,7 @@ void introduce_train_into_network(struct train_type *train, double all_stations_
 void in_station_action(struct train_type *train, int train_number, int S, char *line_stations_name_list[], int **line_stations, char *all_stations_list[], int num_stations, double all_stations_popularity_list[], int **link_transit_time, int **links_status);
 void in_transit_action(struct train_type *train, int num_stations, int S, int **line_stations, char* line_stations_name_list[], char *all_stations_list[], int **links_status_update);
 void update_train_stations(int direction_index, int num_stations, int **train_stations, struct train_type trains[]);
-void update_links_status(int **links_status_update, int **links_status);
+void update_links_status(int **links_status_update, int **links_status, int S;
 
 // Function declaration: Calculating waiting time
 double get_average_waiting_time(int num_green_stations, int **green_station_waiting_times, int N);
@@ -176,11 +176,11 @@ void update_train_stations(int direction_index, int num_stations, int **train_st
     }
 }
 
-void update_links_status(int **links_status_update, int **links_status) {
+void update_links_status(int **links_status_update, int **links_status, int S) {
     int i;
     int j;
-    for (i = 0; i < 8; i++) {
-        for (j = 0; j < 8; j ++) {
+    for (i = 0; i < S; i++) {
+        for (j = 0; j < S; j ++) {
             if (links_status_update[i][j] == FREE_THIS_LINK) {
                 links_status[i][j] = LINK_IS_EMPTY;
                 links_status_update[i][j] = LINK_DEFAULT_STATUS;
@@ -686,7 +686,7 @@ int main(int argc, char *argv[]) {
             update_train_stations(i, num_yellow_stations, yellow_stations, trains);
         }
         // Free up the links which were just used by trains if any.
-        update_links_status(links_status_update, links_status);
+        update_links_status(links_status_update, links_status, S);
         printf("~~~~ GREEN TRAINS ~~~~~");
         print_status(trains, num_all_trains, G, num_green_stations, GREEN);
         printf("~~~~ YELLOW TRAINS ~~~~~");
