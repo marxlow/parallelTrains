@@ -15,9 +15,9 @@
 #define IN_TRANSIT 1
 #define IN_STATION 0
 #define NOT_IN_NETWORK -1
-#define GREEN 1
-#define BLUE 2
-#define YELLOW 3
+#define GREEN 0
+#define BLUE 1
+#define YELLOW 2
 
 // Links
 #define LINK_IS_EMPTY -1
@@ -68,7 +68,7 @@ double get_average_waiting_time(int num_green_stations, int **green_station_wait
 void get_longest_shortest_average_waiting_time(int num_green_stations, int **green_station_waiting_times, int N, double *longest_average_waiting_time, double *shortest_average_waiting_time);
 
 // Function declaration: Helper functions
-void print_status(struct train_type trains[], int num_trains, char *G[], int num_stations);
+void print_status(struct train_type trains[], int num_trains, char *G[], int num_stations, int line);
 int get_next_station(int prev_station, int direction, int num_stations);
 int get_all_station_index(int num_all_stations, int line_station_index, char *line_stations[], char *all_stations_list[]);
 int calculate_loadtime(double popularity);
@@ -82,9 +82,7 @@ void introduce_train_into_network(struct train_type *train, double all_stations_
         starting_station = 0;
     } else if (*introduced_train_left == NOT_INTRODUCED) {
         starting_station = num_stations - 1;
-        // printf("Starting station: %d\n", starting_station);
     }
-
     // Introducing a train into the network.
     if (starting_station != -1) {
         if (starting_station == 0) {
@@ -96,18 +94,15 @@ void introduce_train_into_network(struct train_type *train, double all_stations_
         }
         train->status = IN_STATION;
         train->station = starting_station;
-        // printf("I'M HERE SHOULD BE TWICE. TRAIN DIRECTION : %d, STARTING STATION: %d \n", train->direction, starting_station);
-        // printf("CURRENT LINE STATUS = %d\n", line_stations[train->direction][starting_station]);
         if (line_stations[train->direction][starting_station] == UNVISITED) {
             line_stations[train->direction][starting_station] = READY_TO_LOAD;
         }        
-        // printf("After LINE STATUS = %d\n", line_stations[train->direction][starting_station]);
         // If no trains are loading. We will start loading the introduced train immediately.
         if (line_stations[train->direction][starting_station] == READY_TO_LOAD) {
             line_stations[train->direction][starting_station] = train_number;                // The train number is the global train index. 
             int global_station_index = get_all_station_index(num_network_train_stations, train->station, line_stations_name_list, all_stations_list);
             train->loading_time = calculate_loadtime(all_stations_popularity_list[global_station_index]) - 1; 
-            printf("Setting train %d as loading time %d.\n", train_number, train->loading_time);
+            //printf("Setting train %d as loading time %d.\n", train_number, train->loading_time);
         }
     }
 }
@@ -241,11 +236,13 @@ int change_train_direction(int direction)  {
     return direction % 2;
 }
 
-void print_status(struct train_type trains[], int num_trains, char *G[], int num_stations) {
+void print_status(struct train_type trains[], int num_all_trains, char *line_station_names[], int num_stations, int line) {
     int i;
     printf("\n~~~~~~~~~~ TRAIN STATUS ~~~~~~~~~~~\n");
-    for (i = 0; i < num_trains; i++)
-    {
+    for (i = 0; i < num_all_trains; i++) {
+        if (trains[i].line != line){
+            continue;
+        }
         char *direction;
         if (trains[i].direction == LEFT) {
             direction = "Left";
@@ -263,7 +260,7 @@ void print_status(struct train_type trains[], int num_trains, char *G[], int num
         {
             int current_station = trains[i].station;
             int next_station = get_next_station(current_station, trains[i].direction, num_stations);
-            printf("Train %d is currently in transit %s->%s | With %d ticks left to transit.\n", i, G[current_station], G[next_station], trains[i].transit_time);
+            printf("Train %d is currently in transit %s->%s | With %d ticks left to transit.\n", i, line_station_names[current_station], line_station_names[next_station], trains[i].transit_time);
         }
     }
 }
@@ -382,7 +379,7 @@ int main(int argc, char *argv[]) {
     }
 
     int num_green_stations = sizeof(G) / sizeof(G[0]);
-    int num_yellow_stations = sizeof(Y) / sizeof(G[0]);
+    int num_yellow_stations = sizeof(Y) / sizeof(Y[0]);
     int num_blue_stations = sizeof(B) / sizeof(B[0]);
     // INITIALISATION of arrays that keep track of the status of EACH station on EACH line in EACH direction.
     // If a station is occupied, it will store the GLOBAL INDEX of the train from the trains array.
@@ -446,11 +443,16 @@ int main(int argc, char *argv[]) {
     for (time_tick = 0; time_tick < N; time_tick++) {
         // Entering the stations 1 time tick at a time.
         int i;
+        int j;
         // Boolean value to make sure that only 1 train enters the line at any time tick.
-        // TODO(LOWJIANSHENG): Have an introduced boolean for every single line.
-        int introduced_train_left = NOT_INTRODUCED;
-        int introduced_train_right = NOT_INTRODUCED;
-    #pragma omp parallel for shared(introduced_train_left, introduced_train_right, green_stations, yellow_stations, blue_stations, trains) private(i)
+        // Introduced train keeps track of at every iteration if a train has been introduced into the line.
+        int introduced_train[2][3];
+        for (i = 0 ; i < 2; i++) {
+            for (j = 0; j < 3; j++) {
+                introduced_train[i][j] = NOT_INTRODUCED;
+            }
+        }
+    #pragma omp parallel for shared(introduced_train, green_stations, yellow_stations, blue_stations, trains) private(i)
         // Each Parallel thread will take up a train
         for (i = 0; i < num_all_trains; i++) {
             // Initialization of each train(thread)
@@ -458,15 +460,23 @@ int main(int argc, char *argv[]) {
             int **line_stations;
             char **line_stations_name_list;
             int num_stations;
+            int *introduced_train_left;
+            int *introduced_train_right;
             if (trains[i].line == GREEN) {
+                introduced_train_left = &introduced_train[LEFT][GREEN];
+                introduced_train_right = &introduced_train[RIGHT][GREEN];
                 line_stations = green_stations;
                 line_stations_name_list = G; 
                 num_stations = num_green_stations;
             } else if (trains[i].line == BLUE) {
+                introduced_train_left = &introduced_train[LEFT][BLUE];
+                introduced_train_right = &introduced_train[RIGHT][BLUE];
                 line_stations = blue_stations;
                 line_stations_name_list = B;
                 num_stations = num_blue_stations;
             } else {
+                introduced_train_left = &introduced_train[LEFT][YELLOW];
+                introduced_train_right = &introduced_train[RIGHT][YELLOW];
                 line_stations = yellow_stations;
                 line_stations_name_list = Y;
                 num_stations = num_yellow_stations;
@@ -476,7 +486,7 @@ int main(int argc, char *argv[]) {
             if (trains[i].status == NOT_IN_NETWORK) {
                 #pragma omp critical
                 {   
-                    introduce_train_into_network(&trains[i], all_stations_popularity_list, line_stations, line_stations_name_list, all_stations_list, num_stations, S, i, &introduced_train_left, &introduced_train_right);
+                    introduce_train_into_network(&trains[i], all_stations_popularity_list, line_stations, line_stations_name_list, all_stations_list, num_stations, S, i, introduced_train_left, introduced_train_right);
                 }
             }
             else if (trains[i].status == IN_STATION) {
@@ -521,7 +531,12 @@ int main(int argc, char *argv[]) {
         }
         // Free up the links which were just used by trains if any.
         update_links_status(links_status_update, links_status);
-        print_status(trains, g, G, num_green_stations);
+        printf("~~~~ GREEN TRAINS ~~~~~");
+        print_status(trains, num_all_trains, G, num_green_stations, GREEN);
+        printf("~~~~ YELLOW TRAINS ~~~~~");
+        print_status(trains, num_all_trains, Y, num_yellow_stations, YELLOW);
+        printf("~~~~ BLUE TRAINS ~~~~~");
+        print_status(trains, num_all_trains, B, num_blue_stations, BLUE);
         printf("\n\n");
     }
 
