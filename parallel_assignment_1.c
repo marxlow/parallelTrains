@@ -68,7 +68,7 @@ void get_longest_shortest_average_waiting_time(int num_green_stations, int **gre
 
 // Function declaration: Helper functions
 void print_status(struct train_type trains[], int num_trains, char *G[], int num_stations, int line);
-void print_output(int iteration, struct train_type trains[], int num_trains, char *G[], char *Y[], char *B[], int num_green_trains, int num_yellow_trains, int num_blue_trains, char *all_stations_list[], int num_all_stations);
+void print_output(int iteration, struct train_type trains[], int num_trains, char *G[], char *Y[], char *B[], int num_green_trains, int num_yellow_trains, int num_blue_trains, char *all_stations_list[], int num_all_stations, int num_green_stations, int num_yellow_stations, int num_blue_stations);
 int get_next_station(int prev_station, int direction, int num_stations);
 int get_all_station_index(int num_all_stations, int line_station_index, char *line_stations[], char *all_stations_list[]);
 int calculate_loadtime(double popularity);
@@ -102,7 +102,6 @@ void introduce_train_into_network(struct train_type *train, double all_stations_
             line_stations[train->direction][starting_station] = train_number;                // The train number is the global train index. 
             int global_station_index = get_all_station_index(num_network_train_stations, train->station, line_stations_name_list, all_stations_list);
             train->loading_time = calculate_loadtime(all_stations_popularity_list[global_station_index]) - 1; 
-            //printf("Setting train %d as loading time %d.\n", train_number, train->loading_time);
         }
     }
 }
@@ -124,7 +123,7 @@ void in_station_action(struct train_type *train, int train_number, int S, char *
                     train->status = IN_TRANSIT;
                     train->loading_time = WAITING_TO_LOAD;
                     links_status[current_all_station_index][next_all_station_index] = LINK_IS_USED;
-                }
+            }
         }
     }
     // Load a waiting train
@@ -137,6 +136,7 @@ void in_station_action(struct train_type *train, int train_number, int S, char *
 
 void in_transit_action(struct train_type *train, int num_stations, int S, int **line_stations, char* line_stations_name_list[], char *all_stations_list[], int **links_status_update) {
     train->transit_time--;
+    
     if (train->transit_time == 0) {
         // Move the train to the next station
         int prev_station;
@@ -172,7 +172,6 @@ void update_train_stations(int direction_index, int num_stations, int **train_st
     for (i = 0 ; i < num_stations; i++) {
         train_index = train_stations[direction_index][i];
         if (train_index >= 0 && trains[train_index].loading_time == FINISHED_LOADING) {
-            // printf("Train %d Has finished loading at station [%d][%d]", train_index, direction_index, i);
             train_stations[direction_index][i] = READY_TO_LOAD; 
         }
     }
@@ -183,11 +182,15 @@ void update_links_status(int **links_status_update, int **links_status, int S) {
     int j;
     for (i = 0; i < S; i++) {
         for (j = 0; j < S; j ++) {
+            
             if (links_status_update[i][j] == FREE_THIS_LINK) {
                 links_status[i][j] = LINK_IS_EMPTY;
                 links_status_update[i][j] = LINK_DEFAULT_STATUS;
             }
+            // printf("%d ", links_status[i][j]);
+            //printf("%d ", links_status_update[i][j]);
         }
+        //printf("\n");
     }
 }
 
@@ -242,7 +245,7 @@ void get_longest_shortest_average_waiting_time(int num_stations, int **station_w
 }
 
 // Functions: Helper functions
-void print_output(int iteration, struct train_type trains[], int num_trains, char *G[], char *Y[], char *B[], int num_green_trains, int num_yellow_trains, int num_blue_trains, char *all_stations_list[], int num_all_stations) {
+void print_output(int iteration, struct train_type trains[], int num_trains, char *G[], char *Y[], char *B[], int num_green_trains, int num_yellow_trains, int num_blue_trains, char *all_stations_list[], int num_all_stations, int num_green_stations, int num_yellow_stations, int num_blue_stations) {
     int i;
     int train_index;
     int current_station_index;
@@ -257,12 +260,14 @@ void print_output(int iteration, struct train_type trains[], int num_trains, cha
         else if (trains[i].status == IN_STATION) {
             current_station_index = get_all_station_index(num_all_stations, trains[i].station, G, all_stations_list);
             printf(" g%d-s%d,", i, current_station_index);
-        } else if (trains[i].status == IN_TRANSIT) {
+        } 
+        else if (trains[i].status == IN_TRANSIT) {
             prev_station_index = get_all_station_index(num_all_stations, trains[i].station, G, all_stations_list);
-            current_station_index = get_next_station(trains[i].station, trains[i].direction, num_green_trains);
+            current_station_index = get_next_station(trains[i].station, trains[i].direction, num_green_stations);
             current_station_index = get_all_station_index(num_all_stations, current_station_index, G, all_stations_list);
             printf(" g%d-s%d->s%d,", i, prev_station_index, current_station_index);
         }
+        printf("\n");
     }
 
     // Yellow
@@ -276,7 +281,7 @@ void print_output(int iteration, struct train_type trains[], int num_trains, cha
             printf(" y%d-s%d,", train_index, current_station_index);
         } else if (trains[i].status == IN_TRANSIT) {
             prev_station_index = get_all_station_index(num_all_stations, trains[i].station, Y, all_stations_list);
-            current_station_index = get_next_station(trains[i].station, trains[i].direction, num_yellow_trains);
+            current_station_index = get_next_station(trains[i].station, trains[i].direction, num_yellow_stations);
             current_station_index = get_all_station_index(num_all_stations, current_station_index, Y, all_stations_list);
             printf(" y%d-s%d->s%d,", train_index, prev_station_index, current_station_index);
         }
@@ -292,7 +297,7 @@ void print_output(int iteration, struct train_type trains[], int num_trains, cha
             printf(" b%d-s%d,", train_index, current_station_index);
         } else if (trains[i].status == IN_TRANSIT) {
             prev_station_index = get_all_station_index(num_all_stations, trains[i].station, B, all_stations_list);
-            current_station_index = get_next_station(trains[i].station, trains[i].direction, num_blue_trains);
+            current_station_index = get_next_station(trains[i].station, trains[i].direction, num_blue_stations);
             current_station_index = get_all_station_index(num_all_stations, current_station_index, B, all_stations_list);
             printf(" b%d-s%d->s%d,", train_index, prev_station_index, current_station_index);
         }
@@ -392,7 +397,8 @@ int main(int argc, char *argv[]) {
     }
     fgets(c, 1000, fptr);
     int S = atoi(c);
-
+   
+    // Creating all stations list.
     fgets(c, 1000, fptr);
     char *all_stations_list[S];
     const char delimiter[2] = ",";
@@ -417,6 +423,7 @@ int main(int argc, char *argv[]) {
         station_value[index] = '\0';
         all_stations_list[i] = station_value;  
     }
+
     // S x S matrix denoting the link transit time.
     int *link_transit_time[S];
     for (i = 0 ; i < S; i++) {
@@ -436,7 +443,7 @@ int main(int argc, char *argv[]) {
             value = strtok(NULL, space_delimiter);
         }
     }
-
+   
     // POPULARITY LIST.
     double *all_stations_popularity_list = malloc(S * sizeof(double));
     double double_value;
@@ -448,6 +455,7 @@ int main(int argc, char *argv[]) {
         all_stations_popularity_list[i] = double_value;
         value = strtok(NULL, space_delimiter);
     }
+    
     
     // GREEN TRAIN STATION LIST.
     char *temp_G[S];
@@ -464,7 +472,7 @@ int main(int argc, char *argv[]) {
     for (i = 0 ; i < num_green_stations; i++) {
         G[i] = temp_G[i];
     }
-    for (i = 0 ; i < S; i++ ){
+    for (i = 0 ; i < num_green_stations; i++ ){
         char *station = G[i];
         int index = 0;
         char *station_value = malloc(100*sizeof(char));
@@ -477,6 +485,7 @@ int main(int argc, char *argv[]) {
         }
         station_value[index] = '\0';
         G[i] = station_value;  
+    
     }
 
     // BLUE TRAIN STATION LIST
@@ -493,7 +502,7 @@ int main(int argc, char *argv[]) {
     for (i = 0 ; i < num_blue_stations; i++) {
         B[i] = temp_B[i];
     }
-    for (i = 0 ; i < S; i++ ){
+    for (i = 0 ; i < num_blue_stations; i++ ){
         char *station = B[i];
         int index = 0;
         char *station_value = malloc(100*sizeof(char));
@@ -522,7 +531,7 @@ int main(int argc, char *argv[]) {
     for (i = 0 ; i < num_yellow_stations; i++) {
         Y[i] = temp_Y[i];
     }
-    for (i = 0 ; i < S; i++ ){
+    for (i = 0 ; i < num_yellow_stations; i++ ){
         char *station = Y[i];
         int index = 0;
         char *station_value = malloc(100*sizeof(char));
@@ -548,6 +557,7 @@ int main(int argc, char *argv[]) {
     value = strtok(NULL, delimiter);
     int b = atoi(value);
     fclose(fptr);
+  
     //---------------------------- PARSING INPUT FROM THE INPUT FILE. -------------------------------//
 
     // Initialize Link status. -1: Link is empty | 1: Link is used
@@ -705,6 +715,7 @@ int main(int argc, char *argv[]) {
             } else {
                 c = "right";
             }
+            
             for (j = 0; j < num_green_stations; j++) {
                 if (green_stations[i][j] == READY_TO_LOAD) {
                     green_station_waiting_times[i][j] += 1;
@@ -730,7 +741,7 @@ int main(int argc, char *argv[]) {
         // Free up the links which were just used by trains if any.
         update_links_status(links_status_update, links_status, S);
         // Print logs to file
-        print_output(time_tick, trains, num_all_trains, G, Y, B, g, y, b, all_stations_list, S);
+       print_output(time_tick, trains, num_all_trains, G, Y, B, g, y, b, all_stations_list, S, num_green_stations, num_yellow_stations, num_blue_stations);
 
     }
     // Close clock for time
@@ -764,24 +775,4 @@ int main(int argc, char *argv[]) {
     stdout = saved;
 
     printf("~~~~~ END OF NETWORK!!! ~~~~~\n");
-    // printf("~~~~~ GREEN WAITING TIMES ~~~~~\n");
-    // for (i = 0; i < 2; i ++) {
-    //     for (j = 0; j < num_green_stations; j++) {
-    //         printf("(at %d) Station %d waiting time: %d\n", i, j, green_station_waiting_times[i][j]);
-    //     }
-    // }
-
-    // printf("~~~~~ YELLOW WAITING TIMES ~~~~~\n");
-    // for (i = 0; i < 2; i ++) {
-    //     for (j = 0; j < num_yellow_stations; j++) {
-    //         printf("(at %d) Station %d waiting time: %d\n", i, j, yellow_station_waiting_times[i][j]);
-    //     }
-    // }
-
-    // printf("~~~~~ BLUE WAITING TIMES ~~~~~\n");
-    // for (i = 0; i < 2; i ++) {
-    //     for (j = 0; j < num_blue_stations; j++) {
-    //         printf("(at %d) Station %d waiting time: %d\n", i, j, blue_station_waiting_times[i][j]);
-    //     }
-    // }
 }
