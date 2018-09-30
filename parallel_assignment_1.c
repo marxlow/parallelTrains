@@ -182,15 +182,11 @@ void update_links_status(int **links_status_update, int **links_status, int S) {
     int j;
     for (i = 0; i < S; i++) {
         for (j = 0; j < S; j ++) {
-            
             if (links_status_update[i][j] == FREE_THIS_LINK) {
                 links_status[i][j] = LINK_IS_EMPTY;
                 links_status_update[i][j] = LINK_DEFAULT_STATUS;
             }
-            // printf("%d ", links_status[i][j]);
-            //printf("%d ", links_status_update[i][j]);
         }
-        //printf("\n");
     }
 }
 
@@ -267,7 +263,6 @@ void print_output(int iteration, struct train_type trains[], int num_trains, cha
             current_station_index = get_all_station_index(num_all_stations, current_station_index, G, all_stations_list);
             printf(" g%d-s%d->s%d,", i, prev_station_index, current_station_index);
         }
-        printf("\n");
     }
 
     // Yellow
@@ -488,6 +483,35 @@ int main(int argc, char *argv[]) {
     
     }
 
+    // YELLOW TRAIN STATION LIST
+    char *temp_Y[S];
+    fgets(c, 1000, fptr);
+    station = strtok(c, delimiter);
+    int num_yellow_stations = 0;
+    while (station != NULL){
+        temp_Y[num_yellow_stations] = station;
+        num_yellow_stations++;
+        station = strtok(NULL, delimiter);
+    }
+    char *Y[num_yellow_stations];
+    for (i = 0 ; i < num_yellow_stations; i++) {
+        Y[i] = temp_Y[i];
+    }
+    for (i = 0 ; i < num_yellow_stations; i++ ){
+        char *station = Y[i];
+        int index = 0;
+        char *station_value = malloc(100*sizeof(char));
+        while (station[index] != '\0') {
+            if (station[index] == '\n'){
+                break;
+            }
+            station_value[index] = station[index];
+            index++;
+        }
+        station_value[index] = '\0';
+        Y[i] = station_value;  
+    }
+
     // BLUE TRAIN STATION LIST
     char *temp_B[S];
     fgets(c, 1000, fptr);
@@ -517,34 +541,6 @@ int main(int argc, char *argv[]) {
         B[i] = station_value;  
     }
 
-    // YELLOW TRAIN STATION LIST
-    char *temp_Y[S];
-    fgets(c, 1000, fptr);
-    station = strtok(c, delimiter);
-    int num_yellow_stations = 0;
-    while (station != NULL){
-        temp_Y[num_yellow_stations] = station;
-        num_yellow_stations++;
-        station = strtok(NULL, delimiter);
-    }
-    char *Y[num_yellow_stations];
-    for (i = 0 ; i < num_yellow_stations; i++) {
-        Y[i] = temp_Y[i];
-    }
-    for (i = 0 ; i < num_yellow_stations; i++ ){
-        char *station = Y[i];
-        int index = 0;
-        char *station_value = malloc(100*sizeof(char));
-        while (station[index] != '\0') {
-            if (station[index] == '\n'){
-                break;
-            }
-            station_value[index] = station[index];
-            index++;
-        }
-        station_value[index] = '\0';
-        Y[i] = station_value;  
-    }  
     // Get count of number of trains and close file pointer
     fgets(c, 1000, fptr);
     int N = atoi(c); 
@@ -663,7 +659,7 @@ int main(int argc, char *argv[]) {
                 introduced_train[i][j] = NOT_INTRODUCED;
             }
         }
-    #pragma omp parallel for shared(introduced_train, green_stations, yellow_stations, blue_stations, trains) private(i)
+    #pragma omp parallel for schedule(dynamic) shared(introduced_train, green_stations, yellow_stations, blue_stations, trains) private(i)
         // Each Parallel thread will take up a train
         for (i = 0; i < num_all_trains; i++) {
             // Initialization of each train(thread)
