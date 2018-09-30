@@ -637,7 +637,7 @@ int main(int argc, char *argv[]) {
     }
 
     // INITIALISATION of thread
-    omp_set_num_threads(num_all_trains+1);
+    omp_set_num_threads(num_all_trains);
 
     // INITIALISATION of logs
     FILE* fp = fopen("log.txt", "w");
