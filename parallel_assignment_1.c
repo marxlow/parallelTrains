@@ -739,7 +739,7 @@ int main(int argc, char *argv[]) {
     // Close clock for time
     clock_t difference = clock() - before;
     msec = difference * 1000 / CLOCKS_PER_SEC;
-    fprintf(fp, "Time taken: %d seconds %d milliseconds\n", msec/1000, msec%1000);
+    printf("Time taken: %d seconds %d milliseconds\n", msec/1000, msec%1000);
 
     // Get waiting time
     double green_longest_average_waiting_time = 0;
