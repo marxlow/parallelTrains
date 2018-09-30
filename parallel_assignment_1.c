@@ -87,10 +87,10 @@ void introduce_train_into_network(struct train_type *train, double all_stations_
     if (starting_station != -1) {
         if (starting_station == 0) {
             *introduced_train_right = INTRODUCED;
-            train->direction = RIGHT;        
+            train->direction = LEFT;
         } else {
             *introduced_train_left = INTRODUCED;
-            train->direction = LEFT;
+            train->direction = RIGHT;
         }
         train->status = IN_STATION;
         train->station = starting_station;
@@ -126,7 +126,6 @@ void in_station_action(struct train_type *train, int train_number, int S, char *
                     links_status[current_all_station_index][next_all_station_index] = LINK_IS_USED;
                 }
         }
- 
     }
     // Load a waiting train
     if (train->status == IN_STATION && train->loading_time == WAITING_TO_LOAD && line_stations[train->direction][train->station] == READY_TO_LOAD) {
@@ -199,6 +198,14 @@ double get_average_waiting_time(int num_stations, int **station_waiting_times, i
     int total_waiting_time = 0;
     for (i = 0; i < 2; i++) {
         for (j = 0; j < num_stations; j++) {
+            // Skip LEFT ending terminal
+            if (i == 0 && j == num_stations -1) {
+                continue;
+            }
+            // Skip RIGHT starting terminal
+            if (i == 1 && j == 0) {
+                continue;
+            }
             total_waiting_time += station_waiting_times[i][j];
         }
     }
@@ -213,6 +220,14 @@ void get_longest_shortest_average_waiting_time(int num_stations, int **station_w
     int j;
     for (i = 0; i < 2; i++) {
         for (j = 0; j < num_stations; j++) {
+            // Skip LEFT ending terminal
+            if (i == 0 && j == num_stations -1) {
+                continue;
+            }
+            // Skip RIGHT starting terminal
+            if (i == 1 && j == 0) {
+                continue;
+            }
             double waiting_time = (double)station_waiting_times[i][j];
             double station_average_waiting_time = waiting_time / (double)N;
             // Update waiting times
@@ -464,7 +479,6 @@ int main(int argc, char *argv[]) {
         G[i] = station_value;  
     }
 
-
     // BLUE TRAIN STATION LIST
     char *temp_B[S];
     fgets(c, 1000, fptr);
@@ -522,44 +536,19 @@ int main(int argc, char *argv[]) {
         station_value[index] = '\0';
         Y[i] = station_value;  
     }  
-
+    // Get count of number of trains and close file pointer
     fgets(c, 1000, fptr);
     int N = atoi(c); 
     fgets(c, 1000, fptr);
-    strtok(c, delimiter);
-    int g = atoi(c);
-    strtok(NULL, delimiter);
-    int y = atoi(c);
-    strtok(NULL, delimiter);
-    int b = atoi(c);
 
+    value = strtok(c, delimiter);
+    int g = atoi(value);
+    value = strtok(NULL, delimiter);
+    int y = atoi(value);
+    value = strtok(NULL, delimiter);
+    int b = atoi(value);
     fclose(fptr);
-
-    printf("~~ALL STATIONS~~\n");
-    for (i = 0 ; i < S; i ++ ) {
-        printf("%s, ", all_stations_list[i]);
-    }
-    printf("\n");
-    
-    printf("\n");
-    printf("~~GREEN~~\n");
-    for (i = 0; i < num_green_stations; i++) {
-        printf("%s, ", G[i]);
-    }
-    
-    printf("\n");
-    printf("~~BLUE~~\n");
-    for (i = 0 ; i < num_blue_stations; i++) {
-        printf("%s, ", B[i]);
-    }
-    printf("\n");
-    printf("~~YELLOW~~\n");
-    for (i = 0 ; i < num_yellow_stations; i++) {
-        printf("%s, ", Y[i]);
-    }
-    printf("\n");
     //---------------------------- PARSING INPUT FROM THE INPUT FILE. -------------------------------//
-
 
     // Initialize Link status. -1: Link is empty | 1: Link is used
     int *links_status[S];
@@ -570,12 +559,6 @@ int main(int argc, char *argv[]) {
         for (j = 0; j < S; j++) {
             links_status[i][j] = LINK_IS_EMPTY;
         }
-    }
-    for (i = 0 ; i < S; i++ ) {
-        for (j = 0 ; j < S; j++) {
-            printf("%d ", links_status[i][j]);
-        }
-        printf("\n");
     }
 
     // Initialize all trains,
@@ -649,7 +632,7 @@ int main(int argc, char *argv[]) {
     }
 
     // INITIALISATION of thread
-    omp_set_num_threads(num_all_trains);
+    omp_set_num_threads(num_all_trains+1);
 
     // INITIALISATION of logs
     FILE *saved = stdout;
@@ -657,6 +640,7 @@ int main(int argc, char *argv[]) {
 
     // INITIALISATION of clock
     clock_t before = clock();
+    int master_msec = 0;
     for (time_tick = 0; time_tick < N; time_tick++) {
         // Entering the stations 1 time tick at a time.
         int i;
@@ -698,7 +682,6 @@ int main(int argc, char *argv[]) {
                 line_stations_name_list = Y;
                 num_stations = num_yellow_stations;
             }
-            // printf("~~~~ DEBUG: Train %d | Status: %d", i, trains[i].status);
             // Move the train by a "tick" and update the status of the network
             if (trains[i].status == NOT_IN_NETWORK) {
                 #pragma omp critical
@@ -713,7 +696,6 @@ int main(int argc, char *argv[]) {
                 in_transit_action(&trains[i], num_stations, S, line_stations, line_stations_name_list, all_stations_list, links_status_update);
             }
         }
-
         // Master thread
         // Count the number of idle trains at the start of each iteration. Since READY_TO_LOAD will only be accurately updated after each iteration
         for (i = 0; i < 2; i++) {
@@ -747,14 +729,9 @@ int main(int argc, char *argv[]) {
         }
         // Free up the links which were just used by trains if any.
         update_links_status(links_status_update, links_status, S);
-        // printf("~~~~ GREEN TRAINS ~~~~~");
-        // print_status(trains, num_all_trains, G, num_green_stations, GREEN);
-        // printf("~~~~ YELLOW TRAINS ~~~~~");
-        // print_status(trains, num_all_trains, Y, num_yellow_stations, YELLOW);
-        // printf("~~~~ BLUE TRAINS ~~~~~");
-        // print_status(trains, num_all_trains, B, num_blue_stations, BLUE);
-        // printf("\n\n");
+        // Print logs to file
         print_output(time_tick, trains, num_all_trains, G, Y, B, g, y, b, all_stations_list, S);
+
     }
     // Close clock for time
     clock_t difference = clock() - before;
