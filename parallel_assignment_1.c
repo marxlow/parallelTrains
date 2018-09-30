@@ -297,7 +297,7 @@ void print_output(int iteration, struct train_type trains[], int num_trains, cha
             fprintf(fp, " b%d-s%d->s%d,", train_index, prev_station_index, current_station_index);
         }
     }
-    fprintf(fp, "\n\n");
+    fprintf(fp, "\n");
 }
 
 int change_train_direction(int direction)  {
