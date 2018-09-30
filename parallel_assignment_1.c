@@ -10,6 +10,7 @@
 #include <string.h>
 #include <limits.h>
 #include <math.h>
+#include <time.h>
 
 // Train Status
 #define IN_TRANSIT 1
@@ -192,39 +193,33 @@ void update_links_status(int **links_status_update, int **links_status, int S) {
 }
 
 // Functions: Calculating waiting time
-double get_average_waiting_time(int num_green_stations, int **green_station_waiting_times, int N) {
+double get_average_waiting_time(int num_stations, int **station_waiting_times, int N) {
     int i;
     int j;
     int total_waiting_time = 0;
-    for (i = 0; i < 2; i++)
-    {
-        for (j = 0; j < num_green_stations; j++) 
-        {
-            total_waiting_time += *green_station_waiting_times[i];
+    for (i = 0; i < 2; i++) {
+        for (j = 0; j < num_stations; j++) {
+            total_waiting_time += station_waiting_times[i][j];
         }
     }
     double average_waiting_time;
-    average_waiting_time = (double)total_waiting_time / (double)num_green_stations;
+    average_waiting_time = (double)total_waiting_time / (double)num_stations / (double)2;
     average_waiting_time = average_waiting_time / (double)N;
     return average_waiting_time;
 }
 
-void get_longest_shortest_average_waiting_time(int num_green_stations, int **green_station_waiting_times, int N, double *longest_average_waiting_time, double *shortest_average_waiting_time) {
+void get_longest_shortest_average_waiting_time(int num_stations, int **station_waiting_times, int N, double *longest_average_waiting_time, double *shortest_average_waiting_time) {
     int i;
     int j;
-    for (i = 0; i < 2; i++)
-    {
-        for (j = 0; j < num_green_stations; j++) 
-        {
-            double waiting_time = (double)green_station_waiting_times[i][j];
+    for (i = 0; i < 2; i++) {
+        for (j = 0; j < num_stations; j++) {
+            double waiting_time = (double)station_waiting_times[i][j];
             double station_average_waiting_time = waiting_time / (double)N;
             // Update waiting times
-            if (*longest_average_waiting_time < station_average_waiting_time)
-            {
+            if (*longest_average_waiting_time < station_average_waiting_time) {
                 *longest_average_waiting_time = station_average_waiting_time;
             }
-            if (*shortest_average_waiting_time > station_average_waiting_time)
-            {
+            if (*shortest_average_waiting_time > station_average_waiting_time) {
                 *shortest_average_waiting_time = station_average_waiting_time;
             }
         }
@@ -263,12 +258,12 @@ void print_output(int iteration, struct train_type trains[], int num_trains, cha
         }
         else if (trains[i].status == IN_STATION) {
             current_station_index = get_all_station_index(num_all_stations, trains[i].station, Y, all_stations_list);
-            printf(" g%d-s%d,", train_index, current_station_index);
+            printf(" y%d-s%d,", train_index, current_station_index);
         } else if (trains[i].status == IN_TRANSIT) {
             prev_station_index = get_all_station_index(num_all_stations, trains[i].station, Y, all_stations_list);
             current_station_index = get_next_station(trains[i].station, trains[i].direction, num_yellow_trains);
             current_station_index = get_all_station_index(num_all_stations, current_station_index, Y, all_stations_list);
-            printf(" g%d-s%d->s%d,", train_index, prev_station_index, current_station_index);
+            printf(" y%d-s%d->s%d,", train_index, prev_station_index, current_station_index);
         }
     }
 
@@ -279,12 +274,12 @@ void print_output(int iteration, struct train_type trains[], int num_trains, cha
         }
         else if (trains[i].status == IN_STATION) {
             current_station_index = get_all_station_index(num_all_stations, trains[i].station, B, all_stations_list);
-            printf(" g%d-s%d,", train_index, current_station_index);
+            printf(" b%d-s%d,", train_index, current_station_index);
         } else if (trains[i].status == IN_TRANSIT) {
             prev_station_index = get_all_station_index(num_all_stations, trains[i].station, B, all_stations_list);
             current_station_index = get_next_station(trains[i].station, trains[i].direction, num_blue_trains);
             current_station_index = get_all_station_index(num_all_stations, current_station_index, B, all_stations_list);
-            printf(" g%d-s%d->s%d,", train_index, prev_station_index, current_station_index);
+            printf(" b%d-s%d->s%d,", train_index, prev_station_index, current_station_index);
         }
     }
     printf("\n\n");
@@ -348,7 +343,13 @@ int get_all_station_index(int num_stations, int line_station_index, char *line_s
             return i;
         }
     }
-    printf("WEIRDDDDD...\n");
+
+    for (int i = 0; i < num_stations; i++) {   
+        if (strcmp(line_stations[line_station_index], all_stations_list[i]) == 0) {
+            return i;
+        }
+    }
+    // printf("WEIRD: Query - %s to size %d all_stations_list", line_stations[line_station_index], num_stations);
 }
 
 int calculate_loadtime(double popularity) {
@@ -362,6 +363,8 @@ int main(int argc, char *argv[]) {
     int i;
     int j;
     int k;
+    int time_tick;
+    int msec;
 
     //---------------------------- PARSING INPUT FROM THE INPUT FILE. -------------------------------//
     char c[1000];
@@ -591,9 +594,6 @@ int main(int argc, char *argv[]) {
         trains[i] = initial_blue_train;
     }
 
-    //int num_green_stations = sizeof(G) / sizeof(G[0]);
-    //int num_yellow_stations = sizeof(Y) / sizeof(Y[0]);
-    //int num_blue_stations = sizeof(B) / sizeof(B[0]);
     // INITIALISATION of arrays that keep track of the status of EACH station on EACH line in EACH direction.
     // If a station is occupied, it will store the GLOBAL INDEX of the train from the trains array.
     int *green_stations[2];
@@ -624,7 +624,7 @@ int main(int argc, char *argv[]) {
         green_station_waiting_times[i] = (int*)malloc(num_green_stations * sizeof(int));
         yellow_station_waiting_times[i] = (int*)malloc(num_yellow_stations * sizeof(int));
         blue_station_waiting_times[i] = (int*)malloc(num_blue_stations * sizeof(int));
-    }
+    } 
     for (i = 0; i < 2; i++) {
         for (j = 0 ; j < num_green_stations; j++ ) {
             green_station_waiting_times[i][j] = 0;
@@ -647,15 +647,16 @@ int main(int argc, char *argv[]) {
             links_status_update[i][j] = LINK_DEFAULT_STATUS;
         }
     }
-    // INTIALISATION of 2D array to keep track of station visits
 
     // INITIALISATION of thread
     omp_set_num_threads(num_all_trains);
 
     // INITIALISATION of logs
     FILE *saved = stdout;
-    stdout = fopen("log.txt", "a");
-    int time_tick;
+    stdout = fopen("log.txt", "w");
+
+    // INITIALISATION of clock
+    clock_t before = clock();
     for (time_tick = 0; time_tick < N; time_tick++) {
         // Entering the stations 1 time tick at a time.
         int i;
@@ -755,6 +756,32 @@ int main(int argc, char *argv[]) {
         // printf("\n\n");
         print_output(time_tick, trains, num_all_trains, G, Y, B, g, y, b, all_stations_list, S);
     }
+    // Close clock for time
+    clock_t difference = clock() - before;
+    msec = difference * 1000 / CLOCKS_PER_SEC;
+    printf("Time taken: %d seconds %d milliseconds\n", msec/1000, msec%1000);
+
+    // Get waiting time
+    double green_longest_average_waiting_time = 0;
+    double green_shortest_average_waiting_time = INT_MAX;
+    double green_average_waiting_time = get_average_waiting_time(num_green_stations, green_station_waiting_times, N);
+    get_longest_shortest_average_waiting_time(num_green_stations, green_station_waiting_times, N, &green_longest_average_waiting_time, &green_shortest_average_waiting_time);
+
+    double yellow_longest_average_waiting_time = 0;
+    double yellow_shortest_average_waiting_time = INT_MAX;
+    double yellow_average_waiting_time = get_average_waiting_time(num_yellow_stations, yellow_station_waiting_times, N);
+    get_longest_shortest_average_waiting_time(num_yellow_stations, yellow_station_waiting_times, N, &yellow_longest_average_waiting_time, &yellow_shortest_average_waiting_time);
+    
+    double blue_longest_average_waiting_time = 0;
+    double blue_shortest_average_waiting_time = INT_MAX;
+    double blue_average_waiting_time = get_average_waiting_time(num_blue_stations, blue_station_waiting_times, N);
+    get_longest_shortest_average_waiting_time(num_blue_stations, blue_station_waiting_times, N, &blue_longest_average_waiting_time, &blue_shortest_average_waiting_time);
+    
+    printf("\nAverage waiting times:\n");
+    printf("green: %d trains -> %lf, (longest) %lf, (shortest) %lf\n", g, green_average_waiting_time, green_longest_average_waiting_time, green_shortest_average_waiting_time);
+    printf("yellow: %d trains -> %lf, (longest) %lf, (shortest) %lf\n", y, yellow_average_waiting_time, yellow_longest_average_waiting_time, yellow_shortest_average_waiting_time);
+    printf("blue: %d trains -> %lf, (longest) %lf, (shortest) %lf", b, blue_average_waiting_time, blue_longest_average_waiting_time, blue_shortest_average_waiting_time);
+
     // Close file for logs
     fclose(stdout);
     stdout = saved;
@@ -780,13 +807,4 @@ int main(int argc, char *argv[]) {
     //         printf("(at %d) Station %d waiting time: %d\n", i, j, blue_station_waiting_times[i][j]);
     //     }
     // }
-
-    double green_average_waiting_time = get_average_waiting_time(num_green_stations, green_station_waiting_times, N);
-    double yellow_average_waiting_time = get_average_waiting_time(num_yellow_stations, yellow_station_waiting_times, N);
-    double blue_average_waiting_time = get_average_waiting_time(num_blue_stations, blue_station_waiting_times, N);
-    printf("Green waiting time: %G \n Yellow waiting time: %G \n Blue waiting time: %G \n", green_average_waiting_time, yellow_average_waiting_time, blue_average_waiting_time);
-    // double longest_average_waiting_time = 0;
-    // double shortest_average_waiting_time = INT_MAX;
-    // get_longest_shortest_average_waiting_time(num_green_stations, green_station_waiting_times, N, &longest_average_waiting_time, &shortest_average_waiting_time);
-    // printf("Average waiting time: %G | longest_average_waiting_time: %G | shortest_average_waiting_time: %G\n", average_waiting_time, longest_average_waiting_time, shortest_average_waiting_time);
 }
