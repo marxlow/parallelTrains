@@ -487,16 +487,20 @@ int main(int argc, char *argv[]) {
         // note(lowjiansheng): At the parallel code, have to make sure to change station status to READY_TO_LOAD
         for (i = 0 ; i < num_all_trains; i++) {
             if (trains[i].status == IN_STATION) {
+                int **line_stations;
                 int all_stations_index;
                 // note(lowjiansheng): The station index here is probably the local station index?
                 // NEED SOME WAY TO RANDOMIZE THIS. Else yellow and blue line trains might get starved.
                 if (trains[i].line == GREEN) {
+                    line_stations = green_stations;
                     all_stations_index = get_all_station_index(num_all_trains, trains[i].station, G, all_stations_list);
                 }
                 else if (trains[i].line == BLUE) {
+                    line_stations = blue_stations;
                     all_stations_index = get_all_station_index(num_all_trains, trains[i].station, B, all_stations_list);
                 }
                 else {
+                    line_stations = yellow_stations;
                     all_stations_index = get_all_station_index(num_all_trains, trains[i].station, Y, all_stations_list);
                 }
                 // Load the current train in the station.
@@ -505,7 +509,7 @@ int main(int argc, char *argv[]) {
                     int load_time = calculate_loadtime(123);
                     trains[i].loading_time = load_time;
                     // note(lowjiansheng): do we need to use the green_stations / blue_stations / yellow_stations arrays?
-                    // probably need for counting.
+                    line_stations[trains[i].direction][trains[i].station] = i;
                 }
             } 
             else if (trains[i].status == LOADING) {
