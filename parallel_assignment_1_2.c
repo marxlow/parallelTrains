@@ -4,6 +4,7 @@
 #include <limits.h>
 #include <math.h>
 #include <time.h>
+#include <mpi.h>
 
 // Train Status
 #define IN_TRANSIT 1
@@ -54,6 +55,12 @@ void introduce_train_into_network(struct train_type *train, double all_stations_
 int calculate_loadtime(double popularity);
 int get_all_station_index(int num_all_stations, int line_station_index, char *line_stations[], char *all_stations_list[]);
 
+// Function declaration: Slaves
+void master(int S, int **links_status, int **line_stations, int **green_stations, int num_green_stations, int **yellow_stations, int num_yellow_stations, int **blue_stations, int num_blue_stations);
+// void slave();
+// void slave_receive_data(int data, int **line_stations);
+// void slave_compute_and_send_result(int data, int **line_stations);
+
 
 // Functions: Updating network
 void introduce_train_into_network(struct train_type *train, double all_stations_popularity_list[], int **line_stations, char *line_stations_name_list[], char *all_stations_list[], int num_stations, int num_network_train_stations, int train_number, int *introduced_train_left, int *introduced_train_right) {
@@ -92,20 +99,40 @@ int calculate_loadtime(double popularity) {
     random_number = (rand() % 10) + 1;
     return ceil(random_number * popularity);
 }
-
 int get_all_station_index(int num_stations, int line_station_index, char *line_stations[], char *all_stations_list[]) {
     for (int i = 0; i < num_stations; i++) {   
         if (strcmp(line_stations[line_station_index], all_stations_list[i]) == 0) {
             return i;
         }
     }
+    return -1; // Error return code - this is to fix the compile error that no return type is specified
+    // printf("WEIRD: Query - %s to size %d all_stations_list", line_stations[line_station_index], num_stations);
+}
 
-    for (int i = 0; i < num_stations; i++) {   
-        if (strcmp(line_stations[line_station_index], all_stations_list[i]) == 0) {
-            return i;
+// Functions: Slaves
+void master(int S, int **links_status, int **line_stations, int **green_stations, int num_green_stations, int **yellow_stations, int num_yellow_stations, int **blue_stations, int num_blue_stations){
+    int num_slaves = S * S;
+    int slave_id = 0;
+    int row_id;
+    int col_id;
+    // Send each entry of the link_status matrix to a slave
+    for (row_id = 0; row_id < S; row_id++) {
+        for (col_id = 0; col_id < S; col_id++) {
+			float link_status_buffer;
+            // link_status_buffer = links_status.element[row_id][col_id];
+            // Params: data, size of data, (??), slave_id, row index, col index, (??)
+            // MPI_Send(link_status_buffer, 1, MPI_FLOAT, slave_id, row_id, col_id, MPI_COMM_WORLD);
+            fprintf(stderr," +++ MASTER : Finished sending data '[%f]' from 'links_status' to process %d\n", link_status_buffer, slave_id);
+            slave_id ++;
         }
     }
-    // printf("WEIRD: Query - %s to size %d all_stations_list", line_stations[line_station_index], num_stations);
+    // TODO: Think if we can build and send a struct containing, link_status, stations_statuses: Array. check: "https://stackoverflow.com/questions/9864510/struct-serialization-in-c-and-transfer-over-mpi"
+    // Send status of each the relevant station to each link
+    fprintf(stderr," +++ MASTER : Sending links_status to all slaves\n");
+	for (slave_id = 0; slave_id < num_slaves; slave_id++) {
+        // float buffer[] 
+		// MPI_Send(buffer, size, MPI_FLOAT, slave_id, i, MPI_COMM_WORLD);
+	}
 }
 
 int main(int argc, char *argv[]) {
@@ -340,7 +367,7 @@ int main(int argc, char *argv[]) {
         }
     }
 
-    // INITI ALISATION of 1d Array to keep track of the status of each station
+    // INITIALISATION of 1d Array to keep track of the status of each station
     int station_status[S];
     for (i = 0; i < S; i ++) {
         station_status[i] = READY_TO_LOAD;
@@ -420,7 +447,31 @@ int main(int argc, char *argv[]) {
                 introduce_train_into_network(&trains[i], all_stations_popularity_list, line_stations, line_stations_name_list, all_stations_list, num_stations, S, i, introduced_train_left, introduced_train_right);
             }
         }
-        // PARALLEL CODE
+
+        //---------------------------- START OF PARALLEL CODE -------------------------------//
+        // Initialize parallel parameters
+        // TODO: Initialization of MPI
+        // MPI_Init();
+	    // MPI_Comm_size(MPI_COMM_WORLD, );
+	    // MPI_Comm_rank(MPI_COMM_WORLD, &myid);
+
+        int size = 1; // Size of data each thread is taking.
+        int num_slaves = S * S; // Size of link status matrix, since we are assigning 1 thread = 1 entry.
+        int slave_id = 0;
+        // Send the data of each link_status to a thread. TODO: We only need to send indexes in the link_status matrix where there is a link
+        // if (myid == MASTER_ID)
+	    // {
+		//     fprintf(stderr, " +++ Process %d is master\n", myid);
+		//     master();
+	    // }
+	    // else
+	    // {
+		//     fprintf(stderr, " --- Process %d is slave\n", myid);
+		//     slave();
+	    // }	
+	    // MPI_Finalize();
+        //---------------------------- END OF PARALLEL CODE -------------------------------//
+
         // 1. Pick up trains from stations and put them onto any empty link.
         // 2. Decrease travelling time in the link if the link is occupied.
         // 3. When travelling time decreased to 0, move train into station.
@@ -440,13 +491,13 @@ int main(int argc, char *argv[]) {
                 // note(lowjiansheng): The station index here is probably the local station index?
                 // NEED SOME WAY TO RANDOMIZE THIS. Else yellow and blue line trains might get starved.
                 if (trains[i].line == GREEN) {
-                    all_stations_index = get_all_station_index(num_all_trains, trains[i].station, green_stations, all_stations_list);
+                    all_stations_index = get_all_station_index(num_all_trains, trains[i].station, G, all_stations_list);
                 }
                 else if (trains[i].line == BLUE) {
-                    all_stations_index = get_all_station_index(num_all_trains, trains[i].station, blue_stations, all_stations_list);
+                    all_stations_index = get_all_station_index(num_all_trains, trains[i].station, B, all_stations_list);
                 }
                 else {
-                    all_stations_index = get_all_station_index(num_all_trains, trains[i].station, yellow_stations, all_stations_list);
+                    all_stations_index = get_all_station_index(num_all_trains, trains[i].station, Y, all_stations_list);
                 }
                 // Load the current train in the station.
                 if (station_status[all_stations_index] == READY_TO_LOAD){
