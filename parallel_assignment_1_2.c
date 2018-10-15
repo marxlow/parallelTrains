@@ -61,7 +61,7 @@ int get_all_station_index(int num_all_stations, int line_station_index, char *li
 void print_output(int iteration, struct train_type trains[], int num_trains, char *G[], char *Y[], char *B[], int num_green_trains, int num_yellow_trains, int num_blue_trains, char *all_stations_list[], int num_all_stations, int num_green_stations, int num_yellow_stations, int num_blue_stations, FILE* fp);
 
 // Function declaration: Slaves
-void master(int S, int **links_status, struct train_type trains[], int num_trains);
+void master(int S, int **links_status, struct train_type trains[], int num_trains, int *M[S]);
 // void slave();
 // void slave_receive_data(int data, int **line_stations);
 // void slave_compute_and_send_result(int data, int **line_stations);
@@ -219,31 +219,54 @@ void print_output(int iteration, struct train_type trains[], int num_trains, cha
 }
 
 // Functions: Master Slaves
-void master(int S, int **links_status, struct train_type trains[], int num_trains){
+// This function distributes respective link statuses to the slave thread and 
+
+void master(int S, int **links_status, struct train_type trains[], int num_trains, int *M[S]){
     int num_slaves = S * S;
     int slave_id = 0;
     int row_id;
     int col_id;
 
-    // Send each entry of the link_status matrix to a slave
+    // Sending link statuses to the slaves
     for (row_id = 0; row_id < S; row_id++) {
         for (col_id = 0; col_id < S; col_id++) {
-			float link_status_buffer;
+            // A link exists between station: row_id and station: col_id
+            if (M[row_id][col_id] != 0) {
+                // Send to slave thread an array containing information about the link. 
+                // [0] row_id, aka starting station
+                // [1] col_id, aka destination station
+                // [2] link status
+                // [3] link transit time
+                int link_information[4] = {row_id, col_id, links_status[row_id][col_id], M[row_id][col_id]};
+                MPI_Send(link_information, 4, MPI_INTEGER, slave_id, row_id, MPI_COMM_WORLD);
+                slave_id++;
+            }
+		    //  float link_status_buffer;
             // TODO: We don't have to send the entire 2D array. Only links. Pass in M from input.
             // link_status_buffer = links_status.element[row_id][col_id];
             // Params: data, size of data, (??), slave_id, row index, col index, (??)
             // MPI_Send(link_status_buffer, 1, MPI_FLOAT, slave_id, row_id, col_id, MPI_COMM_WORLD);
-            fprintf(stderr," +++ MASTER : Finished sending data '[%f]' from 'links_status' to process %d\n", link_status_buffer, slave_id);
-            slave_id ++;
+            //fprintf(stderr," +++ MASTER : Finished sending data '[%f]' from 'links_status' to process %d\n", link_status_buffer, slave_id);
         }
+    }
+    printf("+++ MASTER: Now sending all the trains to the slaves.");
+    // Sending over the list of trains to the slaves
+    int i;
+    int j;
+    slave_id = 0;
+    for (i = 0 ; i < num_trains; i++) {
+        int train_status[6] = {trains[i].direction, trains[i].line, trains[i].loading_time, trains[i].station,
+                                trains[i].status, trains[i].transit_time};
+        MPI_SEND(train_status, 6, MPI_INTEGER, slave_id, i, MPI_COMM_WORLD);
+        slave_id++;
     }
 
     // TODO: Think if we can build and send a struct containing, link_status, stations_statuses: Array. check: "https://stackoverflow.com/questions/9864510/struct-serialization-in-c-and-transfer-over-mpi"
     // Send status of train array
     fprintf(stderr," +++ MASTER : Sending links_status to all slaves\n");
-    int i;
-    int j;
 
+    fprintf(stderr, " +++ MASTER : Now receiving results back from the slaves\n");
+    master_receive_results(slave_id, S, M, trains, links_status);
 	// for (i = 0; i < size; i++)
 	// {
 	// 	float buffer[size];
@@ -257,6 +280,38 @@ void master(int S, int **links_status, struct train_type trains[], int num_train
 	// }
 	// fprintf(stderr," +++ MASTER : Finished sending matrix B to all slaves\n");
 }
+
+void master_receive_results(int num_slaves, int S, int *M[S], struct train_type trains[], int **links_status){
+    int i, j, k;
+    int slave_id = 1;
+    int row_id, col_id;
+    MPI_Status status;
+    fprintf(stderr, "+++ MASTER : Receiving the results from slaves:\n");
+    
+    // The slaves will return an array describing the status of the link.
+    // And an array of the train that got modified if any. 
+    // note(lowjiansheng): There can only be one train that is modified per link in any time tick.
+    for (slave_id = 0 ; slave_id < num_slaves; slave_id++){ 
+        int link_status[3];
+        int train_information[6];
+        // Looping through array M to get the link coordinates.
+        for (row_id = 0; row_id < S; row_id++) {
+            for (col_id = 0 ; col_id < S; col_id++) {
+                if (M[row_id][col_id] != 0){
+                    // Array containing link information:
+                    // [0] row_id, aka starting station
+                    // [1] col_id, aka destination station
+                    // [2] link status
+                    MPI_Recv(link_status, 4, MPI_INTEGER, slave_id, row_id, MPI_COMM_WORLD, &status);
+                    // Array containing information about the train at that link that has been modified.
+                    // note(lowjiansheng): If no trains have been modified, should still send back an array. 
+                    MPI_Recv(train_information, 6, MPI_INTEGER, slave_id, row_id, MPI_COMM_WORLD, &status);
+                }   
+            }
+        }
+    }
+}
+
 
 int main(int argc, char *argv[]) {
     int i;
@@ -302,6 +357,7 @@ int main(int argc, char *argv[]) {
     }
 
     // S x S matrix denoting the link transit time.
+    // M 
     int *link_transit_time[S];
     for (i = 0 ; i < S; i++) {
         link_transit_time[i] = (int*)malloc(S * sizeof(int));
