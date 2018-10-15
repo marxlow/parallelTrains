@@ -17,8 +17,7 @@
 // Links
 #define LINK_IS_EMPTY -1
 #define LINK_IS_USED 1
-#define LINK_DEFAULT_STATUS 0
-#define FREE_THIS_LINK 2
+#define LINK_DEFAULT_STATUS -2
 
 // Direction
 #define LEFT 0      // FROM END OF ARRAY TO START 
@@ -38,6 +37,23 @@
 #define INTRODUCED 1
 #define NOT_INTRODUCED 0
 
+// Parallel variables
+#define MASTER_ID slaves
+// (For links)
+#define LINK_ROW_INDEX 0
+#define LINK_COL_INDEX 1
+#define LINK_STATUS_INDEX 2
+#define LINK_TRANSIT_TIME_INDEX 3
+// (For trains)
+#define TRAIN_DIRECTION_INDEX 0
+#define TRAIN_LINE_INDEX 1
+#define TRAIN_LOADING_TIME_INDEX 2
+#define TRAIN_STATION_INDEX 3
+#define TRAIN_STATUS_INDEX 4
+#define TRAIN_TRANSIT_TIME_INDEX 5
+
+int slaves;
+
 struct train_type
 {
     int loading_time; // -1 waiting to load | 0 has loaded finish at the station| > 0 for currently loading
@@ -47,6 +63,9 @@ struct train_type
     int transit_time; // -1 for NA | > 0 for in transit
     int line;
 };
+
+// Parallel variables
+int myid;
 
 // Function declaration: Updating network
 void introduce_train_into_network(struct train_type *train, double all_stations_popularity_list[], int **line_stations, char *line_stations_name_list[], char *all_stations_list[], int num_stations, int num_network_train_stations, int train_number, int *introduced_train_left, int *introduced_train_right);
@@ -58,13 +77,12 @@ void get_longest_shortest_average_waiting_time(int num_green_stations, int **gre
 // Function declaration: Helper functions
 int calculate_loadtime(double popularity);
 int get_all_station_index(int num_all_stations, int line_station_index, char *line_stations[], char *all_stations_list[]);
+int get_next_station(int prev_station, int direction, int num_stations);
 void print_output(int iteration, struct train_type trains[], int num_trains, char *G[], char *Y[], char *B[], int num_green_trains, int num_yellow_trains, int num_blue_trains, char *all_stations_list[], int num_all_stations, int num_green_stations, int num_yellow_stations, int num_blue_stations, FILE* fp);
 
 // Function declaration: Slaves
-void master(int S, int **links_status, struct train_type trains[], int num_trains, int *M[S]);
-// void slave();
-// void slave_receive_data(int data, int **line_stations);
-// void slave_compute_and_send_result(int data, int **line_stations);
+void master(int S, int **links_status, struct train_type trains[], int num_trains, int **link_transit_time);
+void slave(int num_trains, int num_stations, char *G[], char *Y[], char *B[);
 
 // Functions: Updating network
 void introduce_train_into_network(struct train_type *train, double all_stations_popularity_list[], int **line_stations, char *line_stations_name_list[], char *all_stations_list[], int num_stations, int num_network_train_stations, int train_number, int *introduced_train_left, int *introduced_train_right) {
@@ -159,7 +177,23 @@ int get_all_station_index(int num_stations, int line_station_index, char *line_s
         }
     }
     return -1; // Error return code - this is to fix the compile error that no return type is specified
-    // printf("WEIRD: Query - %s to size %d all_stations_list", line_stations[line_station_index], num_stations);
+}
+int get_next_station(int prev_station, int direction, int num_stations) {
+    if (direction == RIGHT)
+    {
+        // Reached the end of the station
+        if (prev_station == num_stations - 1)
+        {
+            return prev_station -1;
+        }
+        return prev_station + 1;
+    }
+    // Reached the start of the station
+    if (prev_station == 0)
+    {
+        return 1;
+    }
+    return prev_station - 1;
 }
 
 void print_output(int iteration, struct train_type trains[], int num_trains, char *G[], char *Y[], char *B[], int num_green_trains, int num_yellow_trains, int num_blue_trains, char *all_stations_list[], int num_all_stations, int num_green_stations, int num_yellow_stations, int num_blue_stations, FILE* fp) {
@@ -220,98 +254,111 @@ void print_output(int iteration, struct train_type trains[], int num_trains, cha
 
 // Functions: Master Slaves
 // This function distributes respective link statuses to the slave thread and 
-
-void master(int S, int **links_status, struct train_type trains[], int num_trains, int *M[S]){
-    int num_slaves = S * S;
+void master(int S, int **links_status, struct train_type trains[], int num_trains, int **link_transit_time) {
+    int num_slaves = 0;
     int slave_id = 0;
     int row_id;
     int col_id;
 
-    // Sending link statuses to the slaves
+    // Send link statuses to the slaves
     for (row_id = 0; row_id < S; row_id++) {
         for (col_id = 0; col_id < S; col_id++) {
             // A link exists between station: row_id and station: col_id
-            if (M[row_id][col_id] != 0) {
+            if (link_transit_time[row_id][col_id] != 0) {
                 // Send to slave thread an array containing information about the link. 
                 // [0] row_id, aka starting station
                 // [1] col_id, aka destination station
                 // [2] link status
                 // [3] link transit time
-                int link_information[4] = {row_id, col_id, links_status[row_id][col_id], M[row_id][col_id]};
+                int link_information[4] = {row_id, col_id, links_status[row_id][col_id], link_transit_time[row_id][col_id]};
                 MPI_Send(link_information, 4, MPI_INTEGER, slave_id, row_id, MPI_COMM_WORLD);
                 slave_id++;
             }
-		    //  float link_status_buffer;
-            // TODO: We don't have to send the entire 2D array. Only links. Pass in M from input.
-            // link_status_buffer = links_status.element[row_id][col_id];
-            // Params: data, size of data, (??), slave_id, row index, col index, (??)
-            // MPI_Send(link_status_buffer, 1, MPI_FLOAT, slave_id, row_id, col_id, MPI_COMM_WORLD);
-            //fprintf(stderr," +++ MASTER : Finished sending data '[%f]' from 'links_status' to process %d\n", link_status_buffer, slave_id);
         }
     }
+
+    // Send over the list of trains to the slaves
     printf("+++ MASTER: Now sending all the trains to the slaves.");
-    // Sending over the list of trains to the slaves
+    num_slaves = slave_id;
     int i;
     int j;
     slave_id = 0;
     for (i = 0 ; i < num_trains; i++) {
-        int train_status[6] = {trains[i].direction, trains[i].line, trains[i].loading_time, trains[i].station,
-                                trains[i].status, trains[i].transit_time};
-        MPI_SEND(train_status, 6, MPI_INTEGER, slave_id, i, MPI_COMM_WORLD);
-        slave_id++;
-    }
-
-    // TODO: Think if we can build and send a struct containing, link_status, stations_statuses: Array. check: "https://stackoverflow.com/questions/9864510/struct-serialization-in-c-and-transfer-over-mpi"
-    // Send status of train array
-    fprintf(stderr," +++ MASTER : Sending links_status to all slaves\n");
-
-    fprintf(stderr, " +++ MASTER : Now receiving results back from the slaves\n");
-    master_receive_results(slave_id, S, M, trains, links_status);
-	// for (i = 0; i < size; i++)
-	// {
-	// 	float buffer[size];
-	// 	for (j = 0; j < size; j++)
-	// 		buffer[j] = b.element[i][j];
-
-	// 	for (slave_id = 0; slave_id < num_slaves; slave_id++)
-	// 	{	
-	// 		MPI_Send(buffer, size, MPI_FLOAT, slave_id, i, MPI_COMM_WORLD);
-	// 	}
-	// }
-	// fprintf(stderr," +++ MASTER : Finished sending matrix B to all slaves\n");
-}
-
-void master_receive_results(int num_slaves, int S, int *M[S], struct train_type trains[], int **links_status){
-    int i, j, k;
-    int slave_id = 1;
-    int row_id, col_id;
-    MPI_Status status;
-    fprintf(stderr, "+++ MASTER : Receiving the results from slaves:\n");
-    
-    // The slaves will return an array describing the status of the link.
-    // And an array of the train that got modified if any. 
-    // note(lowjiansheng): There can only be one train that is modified per link in any time tick.
-    for (slave_id = 0 ; slave_id < num_slaves; slave_id++){ 
-        int link_status[3];
-        int train_information[6];
-        // Looping through array M to get the link coordinates.
-        for (row_id = 0; row_id < S; row_id++) {
-            for (col_id = 0 ; col_id < S; col_id++) {
-                if (M[row_id][col_id] != 0){
-                    // Array containing link information:
-                    // [0] row_id, aka starting station
-                    // [1] col_id, aka destination station
-                    // [2] link status
-                    MPI_Recv(link_status, 4, MPI_INTEGER, slave_id, row_id, MPI_COMM_WORLD, &status);
-                    // Array containing information about the train at that link that has been modified.
-                    // note(lowjiansheng): If no trains have been modified, should still send back an array. 
-                    MPI_Recv(train_information, 6, MPI_INTEGER, slave_id, row_id, MPI_COMM_WORLD, &status);
-                }   
-            }
+        int train_status[6] = { trains[i].direction, trains[i].line, trains[i].loading_time, trains[i].station, trains[i].status, trains[i].transit_time};
+        for (slave_id = 0; slave_id < num_slaves; slave_id++) {
+            MPI_SEND(train_status, 6, MPI_INTEGER, slave_id, i, MPI_COMM_WORLD);
         }
     }
+
+    // Receive results back from slaves
+    fprintf(stderr, " +++ MASTER : Now receiving results back from the slaves\n");
 }
 
+void slave(int num_trains) {
+    MPI_Status status;
+    int i;
+    int size = 4;
+    int link_information_buffer[4];
+    int trains_buffer[num_trains][6];
+    int train_id;
+    // ------------------ RECEIVE DATA ------------------
+    // Link data
+    int row_id;
+	MPI_Recv(&link_information_buffer, size, MPI_INTEGER, MASTER_ID, row_id, MPI_COMM_WORLD, &status);
+
+    // Trains Data
+    size = 6;
+    for (i = 0; i < num_trains; i++) {
+        MPI_Recv(&trains_buffer[i], size, MPI_INTEGER, MASTER_ID, train_id, MPI_COMM_WORLD, &status);
+    }
+
+    // ------------------ Compute data ------------------
+    int link_row_index = link_information_buffer[LINK_ROW_INDEX];
+    int link_col_index = link_information_buffer[LINK_COL_INDEX];
+    int link_status = link_information_buffer[LINK_STATUS_INDEX];
+    int link_transit_time = link_information_buffer[LINK_TRANSIT_TIME_INDEX];
+
+// int get_all_station_index(int num_stations, int line_station_index, char *line_stations[], char *all_stations_list[]) {
+// }
+// int get_next_station(int prev_station, int direction, int num_stations) {
+// }
+    if (link_status == LINK_IS_USED) {
+        // Find the train that is related to this link;
+        for (i = 0; i < num_trains; i++) {
+            if (trains_buffer[i][TRAIN_STATUS_INDEX] != IN_TRANSIT) {
+                continue;
+            }
+            int index_of_train = link_status;
+            int transit_time_of_train = trains_buffer[index_of_train][TRAIN_TRANSIT_TIME_INDEX] --;
+            // Simply decrement and return
+            if (transit_time_of_train != 0) {
+                int[6] updated_train_information = {
+                    trains_buffer[index_of_train][TRAIN_DIRECTION_INDEX],
+                    trains_buffer[index_of_train][TRAIN_LINE_INDEX],
+                    trains_buffer[index_of_train][TRAIN_LOADING_TIME_INDEX],
+                    trains_buffer[index_of_train][TRAIN_STATION_INDEX],
+                    trains_buffer[index_of_train][TRAIN_STATUS_INDEX],
+                    trainsit_time_of_train
+                }
+            }
+
+
+        }
+    } else if (link_status == LINK_IS_EMPTY) {
+
+    } else {
+        // Do nothing.
+    }
+
+// // (For trains)
+// #define TRAIN_DIRECTION_INDEX 0
+// #define TRAIN_LINE_INDEX 1
+// #define TRAIN_LOADING_TIME_INDEX 2
+// #define TRAIN_STATION_INDEX 3
+// #define TRAIN_STATUS_INDEX 4
+// #define TRAIN_TRANSIT_TIME_INDEX 5
+    // Send data
+}
 
 int main(int argc, char *argv[]) {
     int i;
@@ -357,8 +404,8 @@ int main(int argc, char *argv[]) {
     }
 
     // S x S matrix denoting the link transit time.
-    // M 
     int *link_transit_time[S];
+    slaves = 0; // To initialize what the Master ID should be.
     for (i = 0 ; i < S; i++) {
         link_transit_time[i] = (int*)malloc(S * sizeof(int));
     }
@@ -372,6 +419,9 @@ int main(int argc, char *argv[]) {
         int_value = atoi(value);
         for (j = 0 ; j < S; j++) {
             int_value = atoi(value);
+            if (int_value != 0) {
+                slaves++;
+            }
             link_transit_time[i][j] = int_value;
             value = strtok(NULL, space_delimiter);
         }
@@ -493,10 +543,7 @@ int main(int argc, char *argv[]) {
     fclose(fptr);
     
     //---------------------------- PARSING INPUT FROM THE INPUT FILE. -------------------------------//
-    // Initialize link statuses.
-    // Use a 2d array for the link status.
-    // Have each thread in MPI take each cell which is non 0.
-    // Initialize Link status. -1: Link is empty | 1: Link is used
+    // INITIALISATION of link statuses.
     int *links_status[S];
     for (i = 0; i < S; i++) {
         links_status[i] = (int*)malloc(S * sizeof(int));
@@ -507,7 +554,7 @@ int main(int argc, char *argv[]) {
         }
     }
 
-    // Initialize the status of all the trains.
+    // INITIALISATION of the status of all the trains.
     int num_all_trains = g + y + b;
     struct train_type trains[num_all_trains];
     struct train_type initial_green_train = {WAITING_TO_LOAD, NOT_IN_NETWORK, RIGHT, -1, -1, GREEN};
@@ -523,7 +570,7 @@ int main(int argc, char *argv[]) {
         trains[i] = initial_blue_train;
     }
 
-    // Initialize arrays that keep track of the status of the station on each line.
+    // INITIALISATION of arrays that keep track of the status of the station on each line.
     int *green_stations[2];
     int *yellow_stations[2];
     int *blue_stations[2];
@@ -550,7 +597,7 @@ int main(int argc, char *argv[]) {
         station_status[i] = READY_TO_LOAD;
     }
 
-    // Initialisation of arrays that keep track of waiting time.
+    // INITIALISATION of arrays that keep track of waiting time.
     int *green_station_waiting_times[2];
     int *yellow_station_waiting_times[2];
     int *blue_station_waiting_times[2];
@@ -589,13 +636,11 @@ int main(int argc, char *argv[]) {
     clock_t before = clock();
     int msec;
 
-    // Every time tick
+    // STEP 0: ---------------------------- START NETWORK ----------------------------
     for (time_tick = 0; time_tick < N; time_tick++) {
-        // MASTER THREAD
-        // 1. Introduce new trains but do not load.
-        // Boolean value to make sure that only 1 train enters the line at any time tick.
-        // Introduced train keeps track of at every iteration if a train has been introduced into the line.
-        int introduced_train[2][3];
+
+        // STEP 1: ---------------------------- INTRODUCE TRAINS ----------------------------
+        int introduced_train[2][3]; // keeps track of at every iteration if a train has been introduced into the line.
         for (i = 0 ; i < 2; i++) {
             for (j = 0 ; j < 3; j++) {
                 introduced_train[i][j] = NOT_INTRODUCED;
@@ -632,33 +677,27 @@ int main(int argc, char *argv[]) {
             }
         }
 
-        //---------------------------- START OF PARALLEL CODE -------------------------------//
+        // STEP 2: ---------------------------- PARALLEL (Update Links) ----------------------------
         // 1. Pick up trains from stations and put them onto any empty link.
         // 2. Decrease travelling time in the link if the link is occupied.
         // 3. When travelling time decreased to 0, move train into station.
-        
         // Initialize parallel parameters
-        // TODO: Initialization of MPI
-        // MPI_Init();
-	    // MPI_Comm_size(MPI_COMM_WORLD, );
-	    // MPI_Comm_rank(MPI _COMM_WORLD, &myid);
+	    int nprocs;
+	    MPI_Init(&argc,&argv);
+	    MPI_Comm_size(MPI_COMM_WORLD, &nprocs);
+	    MPI_Comm_rank(MPI_COMM_WORLD, &myid);
 
-        // int size = 1; // Size of data each thread is taking.
-        // int num_slaves = S * S; // Size of link status matrix, since we are assigning 1 thread = 1 entry.
-        // int slave_id = 0;
-        // // Send the data of each link_status to a thread. TODO: We only need to send indexes in the link_status matrix where there is a link
-        // if (myid == MASTER_ID) {
-		//     fprintf(stderr, " +++ Process %d is master\n", myid);
-		//     master();
-	    // }
-	    // else {
-		//     fprintf(stderr, " --- Process %d is slave\n", myid);
-		//     slave();
-	    // }	
-	    // MPI_Finalize();
+        // Send the data of each link_status to a thread
+        if (myid == MASTER_ID) {
+		    fprintf(stderr, " +++ Process %d is master\n", myid);
+		    master(S, links_status, trains, num_all_trains, link_transit_time);
+	    } else {
+		    fprintf(stderr, " --- Process %d is slave\n", myid);
+		    slave();
+	    }
+
+	    MPI_Finalize();
         //---------------------------- END OF PARALLEL CODE -------------------------------//
-        
-
         // MASTER THREAD.
         // 1. For every station, choose train that has not loaded yet to load. (Maybe use a queue or randomize.)
         // 2. For every station that has a train which is loading, decrement the loading time. 
