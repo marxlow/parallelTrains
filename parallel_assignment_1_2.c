@@ -51,16 +51,20 @@ struct train_type
 // Function declaration: Updating network
 void introduce_train_into_network(struct train_type *train, double all_stations_popularity_list[], int **line_stations, char *line_stations_name_list[], char *all_stations_list[], int num_stations, int num_network_train_stations, int train_number, int *introduced_train_left, int *introduced_train_right);
 
+// Function declaration: Calculating waiting time
+double get_average_waiting_time(int num_green_stations, int **green_station_waiting_times, int N);
+void get_longest_shortest_average_waiting_time(int num_green_stations, int **green_station_waiting_times, int N, double *longest_average_waiting_time, double *shortest_average_waiting_time);
+
 // Function declaration: Helper functions
 int calculate_loadtime(double popularity);
 int get_all_station_index(int num_all_stations, int line_station_index, char *line_stations[], char *all_stations_list[]);
+void print_output(int iteration, struct train_type trains[], int num_trains, char *G[], char *Y[], char *B[], int num_green_trains, int num_yellow_trains, int num_blue_trains, char *all_stations_list[], int num_all_stations, int num_green_stations, int num_yellow_stations, int num_blue_stations, FILE* fp);
 
 // Function declaration: Slaves
-void master(int S, int **links_status, int **line_stations, int **green_stations, int num_green_stations, int **yellow_stations, int num_yellow_stations, int **blue_stations, int num_blue_stations);
+void master(int S, int **links_status, struct train_type trains[], int num_trains);
 // void slave();
 // void slave_receive_data(int data, int **line_stations);
 // void slave_compute_and_send_result(int data, int **line_stations);
-
 
 // Functions: Updating network
 void introduce_train_into_network(struct train_type *train, double all_stations_popularity_list[], int **line_stations, char *line_stations_name_list[], char *all_stations_list[], int num_stations, int num_network_train_stations, int train_number, int *introduced_train_left, int *introduced_train_right) {
@@ -93,7 +97,56 @@ void introduce_train_into_network(struct train_type *train, double all_stations_
     }
 }
 
-// Functions: Updating network
+// Functions: Calculating waiting time
+double get_average_waiting_time(int num_stations, int **station_waiting_times, int N) {
+    int i;
+    int j;
+    int total_waiting_time = 0;
+    for (i = 0; i < 2; i++) {
+        for (j = 0; j < num_stations; j++) {
+            // Skip LEFT ending terminal
+            if (i == 0 && j == num_stations -1) {
+                continue;
+            }
+            // Skip RIGHT starting terminal
+            if (i == 1 && j == 0) {
+                continue;
+            }
+            total_waiting_time += station_waiting_times[i][j];
+        }
+    }
+    double average_waiting_time;
+    average_waiting_time = (double)total_waiting_time / (double)num_stations / (double)2;
+    average_waiting_time = average_waiting_time / (double)N;
+    return average_waiting_time;
+}
+void get_longest_shortest_average_waiting_time(int num_stations, int **station_waiting_times, int N, double *longest_average_waiting_time, double *shortest_average_waiting_time) {
+    int i;
+    int j;
+    for (i = 0; i < 2; i++) {
+        for (j = 0; j < num_stations; j++) {
+            // Skip LEFT ending terminal
+            if (i == 0 && j == num_stations -1) {
+                continue;
+            }
+            // Skip RIGHT starting terminal
+            if (i == 1 && j == 0) {
+                continue;
+            }
+            double waiting_time = (double)station_waiting_times[i][j];
+            double station_average_waiting_time = waiting_time / (double)N;
+            // Update waiting times
+            if (*longest_average_waiting_time < station_average_waiting_time) {
+                *longest_average_waiting_time = station_average_waiting_time;
+            }
+            if (*shortest_average_waiting_time > station_average_waiting_time) {
+                *shortest_average_waiting_time = station_average_waiting_time;
+            }
+        }
+    }
+}
+
+// Functions: Helper functions
 int calculate_loadtime(double popularity) {
     double random_number;
     random_number = (rand() % 10) + 1;
@@ -109,16 +162,74 @@ int get_all_station_index(int num_stations, int line_station_index, char *line_s
     // printf("WEIRD: Query - %s to size %d all_stations_list", line_stations[line_station_index], num_stations);
 }
 
-// Functions: Slaves
-void master(int S, int **links_status, int **line_stations, int **green_stations, int num_green_stations, int **yellow_stations, int num_yellow_stations, int **blue_stations, int num_blue_stations){
+void print_output(int iteration, struct train_type trains[], int num_trains, char *G[], char *Y[], char *B[], int num_green_trains, int num_yellow_trains, int num_blue_trains, char *all_stations_list[], int num_all_stations, int num_green_stations, int num_yellow_stations, int num_blue_stations, FILE* fp) {
+    int i;
+    int train_index;
+    int current_station_index;
+    int prev_station_index;
+    fprintf(fp, "%d:", iteration);
+    // Print satus of all green trains first
+    for (i = 0; i < num_green_trains; i++) {
+        if (trains[i].status == NOT_IN_NETWORK) {
+            continue;
+        }
+        else if (trains[i].status == IN_STATION) {
+            current_station_index = get_all_station_index(num_all_stations, trains[i].station, G, all_stations_list);
+            fprintf(fp, " g%d-s%d,", i, current_station_index);
+        } 
+        else if (trains[i].status == IN_TRANSIT) {
+            prev_station_index = get_all_station_index(num_all_stations, trains[i].station, G, all_stations_list);
+            current_station_index = get_next_station(trains[i].station, trains[i].direction, num_green_stations);
+            current_station_index = get_all_station_index(num_all_stations, current_station_index, G, all_stations_list);
+            fprintf(fp, " g%d-s%d->s%d,", i, prev_station_index, current_station_index);
+        }
+    }
+    // Yellow
+    for (i = num_green_trains; i < num_green_trains + num_yellow_trains; i++) {
+        train_index = i - num_green_trains;
+        if (trains[i].status == NOT_IN_NETWORK) {
+            continue;
+        }
+        else if (trains[i].status == IN_STATION) {
+            current_station_index = get_all_station_index(num_all_stations, trains[i].station, Y, all_stations_list);
+            fprintf(fp, " y%d-s%d,", train_index, current_station_index);
+        } else if (trains[i].status == IN_TRANSIT) {
+            prev_station_index = get_all_station_index(num_all_stations, trains[i].station, Y, all_stations_list);
+            current_station_index = get_next_station(trains[i].station, trains[i].direction, num_yellow_stations);
+            current_station_index = get_all_station_index(num_all_stations, current_station_index, Y, all_stations_list);
+            fprintf(fp, " y%d-s%d->s%d,", train_index, prev_station_index, current_station_index);
+        }
+    }
+    for (i = num_green_trains + num_yellow_trains; i < num_trains; i++) {
+        train_index = i - num_green_trains - num_yellow_trains;
+        if (trains[i].status == NOT_IN_NETWORK) {
+            continue;
+        }
+        else if (trains[i].status == IN_STATION) {
+            current_station_index = get_all_station_index(num_all_stations, trains[i].station, B, all_stations_list);
+            fprintf(fp, " b%d-s%d,", train_index, current_station_index);
+        } else if (trains[i].status == IN_TRANSIT) {
+            prev_station_index = get_all_station_index(num_all_stations, trains[i].station, B, all_stations_list);
+            current_station_index = get_next_station(trains[i].station, trains[i].direction, num_blue_stations);
+            current_station_index = get_all_station_index(num_all_stations, current_station_index, B, all_stations_list);
+            fprintf(fp, " b%d-s%d->s%d,", train_index, prev_station_index, current_station_index);
+        }
+    }
+    fprintf(fp, "\n");
+}
+
+// Functions: Master Slaves
+void master(int S, int **links_status, struct train_type trains[], int num_trains){
     int num_slaves = S * S;
     int slave_id = 0;
     int row_id;
     int col_id;
+
     // Send each entry of the link_status matrix to a slave
     for (row_id = 0; row_id < S; row_id++) {
         for (col_id = 0; col_id < S; col_id++) {
 			float link_status_buffer;
+            // TODO: We don't have to send the entire 2D array. Only links. Pass in M from input.
             // link_status_buffer = links_status.element[row_id][col_id];
             // Params: data, size of data, (??), slave_id, row index, col index, (??)
             // MPI_Send(link_status_buffer, 1, MPI_FLOAT, slave_id, row_id, col_id, MPI_COMM_WORLD);
@@ -126,13 +237,25 @@ void master(int S, int **links_status, int **line_stations, int **green_stations
             slave_id ++;
         }
     }
+
     // TODO: Think if we can build and send a struct containing, link_status, stations_statuses: Array. check: "https://stackoverflow.com/questions/9864510/struct-serialization-in-c-and-transfer-over-mpi"
-    // Send status of each the relevant station to each link
+    // Send status of train array
     fprintf(stderr," +++ MASTER : Sending links_status to all slaves\n");
-	for (slave_id = 0; slave_id < num_slaves; slave_id++) {
-        // float buffer[] 
-		// MPI_Send(buffer, size, MPI_FLOAT, slave_id, i, MPI_COMM_WORLD);
-	}
+    int i;
+    int j;
+
+	// for (i = 0; i < size; i++)
+	// {
+	// 	float buffer[size];
+	// 	for (j = 0; j < size; j++)
+	// 		buffer[j] = b.element[i][j];
+
+	// 	for (slave_id = 0; slave_id < num_slaves; slave_id++)
+	// 	{	
+	// 		MPI_Send(buffer, size, MPI_FLOAT, slave_id, i, MPI_COMM_WORLD);
+	// 	}
+	// }
+	// fprintf(stderr," +++ MASTER : Finished sending matrix B to all slaves\n");
 }
 
 int main(int argc, char *argv[]) {
@@ -312,10 +435,8 @@ int main(int argc, char *argv[]) {
     value = strtok(NULL, delimiter);
     int b = atoi(value);
     fclose(fptr);
-  
+    
     //---------------------------- PARSING INPUT FROM THE INPUT FILE. -------------------------------//
-  
-
     // Initialize link statuses.
     // Use a 2d array for the link status.
     // Have each thread in MPI take each cell which is non 0.
@@ -405,6 +526,13 @@ int main(int argc, char *argv[]) {
         }
     }
 
+    // INITIALISATION of logs
+    FILE* fp = fopen("log.txt", "w");
+
+    // INITIALISATION of clock
+    clock_t before = clock();
+    int msec;
+
     // Every time tick
     for (time_tick = 0; time_tick < N; time_tick++) {
         // MASTER THREAD
@@ -449,32 +577,30 @@ int main(int argc, char *argv[]) {
         }
 
         //---------------------------- START OF PARALLEL CODE -------------------------------//
+        // 1. Pick up trains from stations and put them onto any empty link.
+        // 2. Decrease travelling time in the link if the link is occupied.
+        // 3. When travelling time decreased to 0, move train into station.
+        
         // Initialize parallel parameters
         // TODO: Initialization of MPI
         // MPI_Init();
 	    // MPI_Comm_size(MPI_COMM_WORLD, );
-	    // MPI_Comm_rank(MPI_COMM_WORLD, &myid);
+	    // MPI_Comm_rank(MPI _COMM_WORLD, &myid);
 
-        int size = 1; // Size of data each thread is taking.
-        int num_slaves = S * S; // Size of link status matrix, since we are assigning 1 thread = 1 entry.
-        int slave_id = 0;
-        // Send the data of each link_status to a thread. TODO: We only need to send indexes in the link_status matrix where there is a link
-        // if (myid == MASTER_ID)
-	    // {
+        // int size = 1; // Size of data each thread is taking.
+        // int num_slaves = S * S; // Size of link status matrix, since we are assigning 1 thread = 1 entry.
+        // int slave_id = 0;
+        // // Send the data of each link_status to a thread. TODO: We only need to send indexes in the link_status matrix where there is a link
+        // if (myid == MASTER_ID) {
 		//     fprintf(stderr, " +++ Process %d is master\n", myid);
 		//     master();
 	    // }
-	    // else
-	    // {
+	    // else {
 		//     fprintf(stderr, " --- Process %d is slave\n", myid);
 		//     slave();
 	    // }	
 	    // MPI_Finalize();
         //---------------------------- END OF PARALLEL CODE -------------------------------//
-
-        // 1. Pick up trains from stations and put them onto any empty link.
-        // 2. Decrease travelling time in the link if the link is occupied.
-        // 3. When travelling time decreased to 0, move train into station.
         
 
         // MASTER THREAD.
@@ -541,12 +667,36 @@ int main(int argc, char *argv[]) {
                 }
             }
         }
+        // Log current iteration information to an output file
+        print_output(time_tick, trains, num_all_trains, G, Y, B, g, y, b, all_stations_list, S, num_green_stations, num_yellow_stations, num_blue_stations, fp);
     }
+    // Close clock for time
+    clock_t difference = clock() - before;
+    msec = difference * 1000 / CLOCKS_PER_SEC;
+    printf("Time taken: %d seconds %d milliseconds\n", msec/1000, msec%1000);
 
+    // Get waiting time
+    double green_longest_average_waiting_time = 0;
+    double green_shortest_average_waiting_time = INT_MAX;
+    double green_average_waiting_time = get_average_waiting_time(num_green_stations, green_station_waiting_times, N);
+    get_longest_shortest_average_waiting_time(num_green_stations, green_station_waiting_times, N, &green_longest_average_waiting_time, &green_shortest_average_waiting_time);
+
+    double yellow_longest_average_waiting_time = 0;
+    double yellow_shortest_average_waiting_time = INT_MAX;
+    double yellow_average_waiting_time = get_average_waiting_time(num_yellow_stations, yellow_station_waiting_times, N);
+    get_longest_shortest_average_waiting_time(num_yellow_stations, yellow_station_waiting_times, N, &yellow_longest_average_waiting_time, &yellow_shortest_average_waiting_time);
     
+    double blue_longest_average_waiting_time = 0;
+    double blue_shortest_average_waiting_time = INT_MAX;
+    double blue_average_waiting_time = get_average_waiting_time(num_blue_stations, blue_station_waiting_times, N);
+    get_longest_shortest_average_waiting_time(num_blue_stations, blue_station_waiting_times, N, &blue_longest_average_waiting_time, &blue_shortest_average_waiting_time);
+    
+    fprintf(fp, "\nAverage waiting times:\n");
+    fprintf(fp, "green: %d trains -> %lf, %lf, %lf\n", g, green_average_waiting_time, green_longest_average_waiting_time, green_shortest_average_waiting_time);
+    fprintf(fp, "yellow: %d trains -> %lf, %lf, %lf\n", y, yellow_average_waiting_time, yellow_longest_average_waiting_time, yellow_shortest_average_waiting_time);
+    fprintf(fp, "blue: %d trains -> %lf, %lf, %lf", b, blue_average_waiting_time, blue_longest_average_waiting_time, blue_shortest_average_waiting_time);
 
-
-    // OUTPUT INTO FILE.
-
+    // Close file for logs
+    fclose(fp);
 }
 
