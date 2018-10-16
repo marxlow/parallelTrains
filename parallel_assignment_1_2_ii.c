@@ -44,18 +44,23 @@
 
 // Parallel variables
 #define MASTER_ID slaves
+#define TRAIN_INFORMATION_TAG 1
+#define LINK_INFORMATION_TAG 2
 // (For links)
-#define LINK_ROW_INDEX 0
-#define LINK_COL_INDEX 1
-#define LINK_STATUS_INDEX 2
-#define LINK_TRANSIT_TIME_INDEX 3
-// (For trains)
-#define TRAIN_DIRECTION_INDEX 0
-#define TRAIN_LINE_INDEX 1
-#define TRAIN_LOADING_TIME_INDEX 2
-#define TRAIN_STATION_INDEX 3
-#define TRAIN_STATUS_INDEX 4
-#define TRAIN_TRANSIT_TIME_INDEX 5
+#define MSG_LINK_ROW_ID 0
+#define MSG_LINK_COL_ID 1
+#define MSG_LINK_STATUS 2
+#define MSG_LINK_TRANSIT_TIME 3
+#define NUM_TRAINS 4
+
+// (receiving trains)
+#define MSG_TRAIN_CURRENT_STATION 0
+#define MSG_TRAIN_NEXT_STATION 1
+#define MSG_TRAIN_LINE 2
+#define MSG_TRAIN_LOADING_TIME 3
+#define MSG_TRAIN_TRANSIT_TIME 4
+#define MSG_TRAIN_STATUS 5
+#define MSG_TRAIN_GLOBAL 6
 
 struct train_type
 {
@@ -69,6 +74,10 @@ struct train_type
 
 int slaves;
 int myid;
+int num_blue_stations;
+int num_green_stations;
+int num_yellow_stations;
+
 #define MASTER_ID slaves
 
 
@@ -109,13 +118,13 @@ int get_next_station(int prev_station, int direction, int num_stations) {
 
 /**
  * Function used by the slaves to receive data from the master
- * Each slave receives a link_status_buffer which is an array containing value of the link
+ * Each slave receives a MSG_LINK_STATUS_buffer which is an array containing value of the link
  * and a num_slaves x 6 matrix containing information of the train in the network
  **/
 void slave_receive_data(int link_information_buffer[5], int **trains_information_buffer) {
     // [0] row_id, aka starting station
     // [1] col_id, aka destination station
-    // [2] link status
+    // [2] link status or train index
 	// [3] link transit time
 	// [4] num_trains;
 	int num_trains;
@@ -129,8 +138,8 @@ void slave_receive_data(int link_information_buffer[5], int **trains_information
 		trains_information_buffer[i] = (int*)(7 * sizeof(int));
 	}
 	// Receiving a 7 * num_trains array containing information about the trains.
-	// [0] current station of the train
-	// [1] next station of the train
+	// [0] current all station of the train
+	// [1] next all station of the train
 	// [2] line of the train
     // [3] loading time of the train
 	// [4] transit time of the train
@@ -151,54 +160,69 @@ void slave_compute(int link_information_buffer[], int **trains_information_buffe
 		int i;
 		// TODO(lowjiansheng): Probably need to randomize, this current implementation WILL cause starvation.
 		for (i = 0 ; i < num_trains ; i++) {
-			if (trains_information_buffer[i][0] == link_information_buffer[0] &&
-				trains_information_buffer[i][1] == link_information_buffer[1] && 
-				trains_information_buffer[i][5] == IN_STATION &&
-				trains_information_buffer[i][3] == 0) {
-				train_to_return[0] = trains_information_buffer[i][6];
+			if (trains_information_buffer[i][MSG_TRAIN_CURRENT_STATION] == link_information_buffer[MSG_LINK_ROW_ID] && // Train current station is link's (from)
+				trains_information_buffer[i][MSG_TRAIN_NEXT_STATION] == link_information_buffer[MSG_LINK_COL_ID] &&  // Train next station is link's (to)
+				trains_information_buffer[i][MSG_TRAIN_STATUS] == IN_STATION && // Train in station
+				trains_information_buffer[i][MSG_TRAIN_LOADING_TIME] == FINISHED_LOADING) { // Train has finished loading in station and is ready to move up a link
+				train_to_return[0] = trains_information_buffer[i][MSG_TRAIN_GLOBAL];
 				train_to_return[1] = IN_TRANSIT;
-				train_to_return[2] = link_information_buffer[3];
+				train_to_return[2] = link_information_buffer[MSG_LINK_TRANSIT_TIME];
 				// Setting the link to store global index of train. Remember to return this to master and store.
-				link_information_buffer[2] = trains_information_buffer[6];
+				link_information_buffer[MSG_LINK_STATUS] = trains_information_buffer[MSG_TRAIN_GLOBAL];
 				break;
 			}
 		}
+        // Code will reach here if there are no trains to enter link. In this case set train_to_return[0] = -1 to indicate that there is no update
+        train_to_return[0] = -1;
 	} 
 	else if (link_information_buffer[2] == LINK_DEFAULT_STATUS){
 		printf("There is an error. Master should not be sending over a link that does not exist.\n");
 	}
 	else {
-		int index_of_train = link_information_buffer[2];
+		int index_of_train = link_information_buffer[MSG_LINK_STATUS]; // Remember that link_status stores the index of the train on it as well.
 		// Decrement the transit time of the train. 
 		// note(lowjiansheng): The result will be sent over as a size 3 array. It is a subset of the train struct.
 		// [0]: global index of the train
 		// [1]: status of train
 		// [2]: transit time of train
+        int updated_transit_time = trains_information_buffer[index_of_train][MSG_TRAIN_TRANSIT_TIME] - 1;
+        int updated_train_status = trains_information_buffer[index_of_train][MSG_TRAIN_STATUS];
+        
 		train_to_return[0] = index_of_train;
-		train_to_return[1] = trains_information_buffer[index_of_train][5];
-		train_to_return[2] = trains_information_buffer[index_of_train][4] - 1;
+		train_to_return[1] = updated_train_status;
+		train_to_return[2] = updated_transit_time;
 		// The link will have to be vacant for the next train to come in.
-		if (trains_information_buffer[index_of_train][4] - 1 == 0) {
-			link_information_buffer[2] = LINK_IS_EMPTY;
+		if (updated_transit_time == 0) {
+			link_information_buffer[MSG_LINK_STATUS] = LINK_IS_EMPTY;
 		}
 	}
+    return;
 }
 
 /**
  * Function used by the slaves to send the updated train/link back to the master
  **/
-void slave_send_result() {
+void slave_send_result(int link_information_buffer[], int train_to_return[], int link_info_size, int train_to_return_size) {
+    // Send the Train info
+    MPI_Send(link_information_buffer, train_to_return_size, MPI_INTEGER, MASTER_ID, TRAIN_INFORMATION_TAG, MPI_COMM_WORLD);
+    // Send the Link info
+    MPI_Send(link_information_buffer, link_info_size, MPI_INTEGER, MASTER_ID, LINK_INFORMATION_TAG, MPI_COMM_WORLD);
 }
-
 
 /**
  * Main function called by slaves
  *
  **/
 void slave() {
-	int link_information_buffer[5];
+    int link_info_size = 5;
+    int train_info_size = 7;
+    int train_to_return_size = 3;
+
+	int link_information_buffer[link_info_size];
 	int **trains_information_buffer;
-	int train_to_return[7];
+    // Information to return to master
+	int train_to_return[train_to_return_size];
+
 	// Receive data
 	slave_receive_data(link_information_buffer, trains_information_buffer);
 
@@ -206,7 +230,7 @@ void slave() {
 	slave_compute(link_information_buffer, trains_information_buffer, train_to_return);
 
 	// Sending the results back
-	slave_send_result();
+	slave_send_result(link_information_buffer, train_to_return, link_info_size, train_to_return_size);
 }
 
 
@@ -216,7 +240,7 @@ void slave() {
  * Function called by the master to distribute link_status
  * and the entire trains array to the child
  **/
-void master_distribute(int S, int **links_status, struct train_type trains[], int num_trains, int **link_transit_time, int G[], int Y[], int B[], char *all_stations_list[]) {
+void master_distribute(int S, int **links_status, struct train_type trains[], int num_trains, int **link_transit_time, char *G[], char *Y[], char *B[], char *all_stations_list[]) {
     int i, j, k;
 	int row_id, col_id;
 	int slave_id = 0;
@@ -278,30 +302,105 @@ void master_distribute(int S, int **links_status, struct train_type trains[], in
 /**
  * Receives the result array information from the slaves
  **/
-void master_receive_result(int S, int num_trains, int num_link, int **link_transit_time) {
+void master_receive_result(int S, int station_status[], int **link_status, int **link_transit_time, struct train_type trains[], char *G[], char *Y[], char *B[], char *all_stations_list[], int **green_stations, int **yellow_stations, int **blue_stations) {
 	MPI_Status status;
-	// Receive results back from slaves
-    fprintf(stderr, " +++ MASTER : Now receiving results back from the slaves\n");
 	// Master waits for an array describing the train link status and an array of the train that has been modified.
+    fprintf(stderr, " +++ MASTER : Now receiving results back from the slaves\n");
 	int i, j;
 	int slave_id = 0;
-	int link_information_buffer[4];
-	int train_information_buffer[6];
-	// Wait for an array describing the train link status.
-	for (i = 0 ; i < S; i++) {
-		for (j = 0 ; j < S; j++) {
-			if (link_transit_time[i][j] != 0) {
-				MPI_Recv(&link_information_buffer, 4, MPI_INTEGER, slave_id , i, MPI_COMM_WORLD, &status);
-				// TODO(lowjiansheng): Update links status with the information from link_information_buffer
-				slave_id++;
-			}
-		}
-	}
+	int link_information_buffer[5];
+	int train_information_buffer[3];
+	// // Wait for an array describing the train link status.
+	// for (i = 0 ; i < S; i++) {
+	// 	for (j = 0 ; j < S; j++) {
+	// 		if (link_transit_time[i][j] != 0) {
+	// 			MPI_Recv(&link_information_buffer, 4, MPI_INTEGER, slave_id , i, MPI_COMM_WORLD, &status);
+	// 			// TODO(lowjiansheng): Update links status with the information from link_information_buffer
+	// 			slave_id++;
+	// 		}
+	// 	}
+	// }
 	// Wait for an array describing the only train that has been modified by the link. 
 	// note(lowjiansheng): The tag_id will be the slave_id as each slave will only return 1 train that has been modified.
-	for (slave_id = 0 ; slave_id < num_link; slave_id++) {
-		MPI_Recv(&link_information_buffer, 4, MPI_INTEGER, slave_id, slave_id, MPI_COMM_WORLD, &status);
-		// TODO(lowjiansheng): Update train status with the information from link_information_buffer.
+	for (slave_id = 0 ; slave_id < slaves; slave_id++) {
+        MPI_Recv(&train_information_buffer, 7, MPI_INTEGER, slave_id, TRAIN_INFORMATION_TAG, MPI_COMM_WORLD, &status);
+		MPI_Recv(&link_information_buffer, 5, MPI_INTEGER, slave_id, LINK_INFORMATION_TAG, MPI_COMM_WORLD, &status);
+
+        // note(Marx): if train_information buffer[0] is < 0 there is no update in the link. We do not have to do anything.
+        if (train_information_buffer[0] < 0) {
+            continue;
+        }
+        
+        //---------------------------- UPDATE TRAINS -------------------------------//
+        int train_index = train_information_buffer[0];
+        int train_status = train_information_buffer[1];
+        int train_transit_time = train_information_buffer[2];
+
+        // Case 1: Train is on the link and still has transit time, just decrement transit time and move on to the next slave
+        if (trains[train_index].status == IN_TRANSIT && train_transit_time > 0) {
+            trains[train_index].transit_time = train_transit_time;
+        }
+        // Case 2: Train was on the link and reached the next station.
+        else if (trains[train_index].status == IN_TRANSIT && train_transit_time == 0) {
+            int num_stations;
+            int next_station;
+            int next_direction;
+            int **line_stations;
+
+            // Find the local index of the next station
+            int prev_station = trains[train_index].station;
+            if (trains[train_index].line == GREEN) {
+                num_stations = num_green_stations;
+                line_stations = green_stations;
+            } else if (trains[i].line == BLUE) {
+                num_stations = num_blue_stations;
+                line_stations = blue_stations;
+            } else {
+                num_stations = num_yellow_stations;
+                line_stations = yellow_stations;
+            }
+            next_station = get_next_station(prev_station, trains[train_index].direction, num_stations);
+
+            // Update the direction of the train (For trains reaching a terminal station)
+            if (prev_station < next_station) {
+                next_direction = RIGHT;
+            } else {
+                next_direction = LEFT;
+            }
+            line_stations[next_direction][next_station] = train_index;
+            trains[train_index].transit_time = 0;
+            trains[train_index].direction = next_direction;
+            trains[train_index].station = next_station;
+            trains[train_index].status = IN_STATION;
+            trains[train_index].loading_time = WAITING_TO_LOAD;
+        } 
+        // Case 3: Train just got onto the link
+        else {
+            int current_station = trains[train_index].station;
+            char *line_stations_name_list;
+            int **line_stations;
+            if (trains[train_index].line == GREEN) {
+                line_stations_name_list = num_green_stations;
+                line_stations = green_stations;
+            } else if (trains[i].line == BLUE) {
+                line_stations_name_list = num_blue_stations;
+                line_stations = blue_stations;
+            } else {
+                line_stations_name_list = num_yellow_stations;
+                line_stations = yellow_stations;
+            }
+            int current_all_station_index = get_all_station_index(S, current_station, line_stations_name_list, all_stations_list);
+            int current_direction = trains[train_index].direction;
+            // Leave the station update
+            station_status[current_all_station_index] = READY_TO_LOAD;
+            line_stations[current_direction][current_station] = READY_TO_LOAD;
+            trains[train_index].status = train_status;
+            trains[train_index].transit_time = train_transit_time;
+        }
+
+        //---------------------------- UPDATE LINKS -------------------------------//
+
+
 	}
 }
 
@@ -393,7 +492,7 @@ void master() {
     fgets(c, 1000, fptr);
     station = strtok(c, delimiter);
     i = 0;
-    int num_green_stations = 0;
+    num_green_stations = 0;
     while (station != NULL){
         temp_G[num_green_stations] = station;
         num_green_stations++;
@@ -423,7 +522,7 @@ void master() {
     char *temp_Y[S];
     fgets(c, 1000, fptr);
     station = strtok(c, delimiter);
-    int num_yellow_stations = 0;
+    num_yellow_stations = 0;
     while (station != NULL){
         temp_Y[num_yellow_stations] = station;
         num_yellow_stations++;
@@ -452,7 +551,7 @@ void master() {
     char *temp_B[S];
     fgets(c, 1000, fptr);
     station = strtok(c, delimiter);
-    int num_blue_stations = 0;
+    num_blue_stations = 0;
     while (station != NULL){
         temp_B[num_blue_stations] = station;
         num_blue_stations++;
@@ -637,7 +736,7 @@ void master() {
 		// Distribute data to slaves
 		master_distribute(S, links_status, trains, num_all_trains, link_transit_time, G, Y, B);
 		// Gather results from slaves
-		master_receive_result();
+		master_receive_result(S, station_status, links_status, link_transit_time, trains, G, Y, B, all_stations_list, green_stations, yellow_stations, blue_stations);
 
 		// MASTER THREAD.
         // 1. For every station, choose train that has not loaded yet to load. (Maybe use a queue or randomize.)
@@ -670,12 +769,16 @@ void master() {
                     station_status[all_stations_index] = LOADING;
                     int load_time = calculate_loadtime(123);
                     trains[i].loading_time = load_time;
-                    // note(lowjiansheng): do we need to use the green_stations / blue_stations / yellow_stations arrays?
+                    // note(lowjiansheng): do we need to use the green_stations / blue_stations / yellow_stations arrays? - Yes
                     line_stations[trains[i].direction][trains[i].station] = i;
                 }
             } 
             else if (trains[i].status == LOADING) {
                 trains[i].loading_time--;
+                // TODO: Now that loading time is == 0, we should make station_status ready to load and see if we have to update line stations(?)
+                if (trains[i].loading_time == 0){
+
+                }
             }
         }
 
