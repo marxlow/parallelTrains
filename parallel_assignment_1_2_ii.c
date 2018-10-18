@@ -74,6 +74,7 @@ struct train_type
     int line;
 };
 
+int num_trains;
 int slaves;
 int myid;
 int num_blue_stations;
@@ -89,7 +90,7 @@ int get_all_station_index(int num_stations, int line_station_index, char *line_s
 int get_next_station(int prev_station, int direction, int num_stations);
 
 // Function Declarations: MPI related
-void slave_receive_data(int link_information_buffer[5], int **trains_information_buffer);
+void slave_receive_data(int link_information_buffer[], int **trains_information_buffer);
 void slave_compute(int link_information_buffer[], int **trains_information_buffer, int train_to_return[]);
 void slave_send_result(int link_information_buffer[], int train_to_return[], int link_info_size, int train_to_return_size);
 void slave();
@@ -168,22 +169,28 @@ int get_next_station(int prev_station, int direction, int num_stations) {
  * Each slave receives a MSG_LINK_STATUS_buffer which is an array containing value of the link
  * and a num_slaves x 6 matrix containing information of the train in the network
  **/
-void slave_receive_data(int link_information_buffer[5], int **trains_information_buffer) {
+void slave_receive_data(int link_information_buffer[], int **trains_information_buffer) {
     // [0] row_id, aka starting station
     // [1] col_id, aka destination station
     // [2] link status or train index
 	// [3] link transit time
 	// [4] num_trains;
-	int num_trains;
 	int i;
+    int num_trains;
 	MPI_Status status;
 	// Receiving information regarding the status of the link.
-	MPI_Recv(&link_information_buffer, 5, MPI_INTEGER, MASTER_ID, 1, MPI_COMM_WORLD, &status);
-	num_trains = link_information_buffer[4];
+	MPI_Recv(link_information_buffer, 5, MPI_INT, MASTER_ID, 1, MPI_COMM_WORLD, &status);
+    num_trains = link_information_buffer[4];
+    fprintf(stderr, "--- Slave %d received link information. Num trains: %d\n", myid, num_trains);
 
+    //TODO: The code is not getting past the below for loop.
+    // This is because of how trains_information_buffer is initialized.
+    // Look to the slave() function to try and debug.
 	for (i = 0 ; i < num_trains; i++){
 		trains_information_buffer[i] = (int*)(7 * sizeof(int));
+        fprintf(stderr, "--- HELLO WORLD IM HERE %d\n", i);
 	}
+    fprintf(stderr, "--- HELLO WORLD\n");
 	// Receiving a 7 * num_trains array containing information about the trains.
 	// [0] current all station of the train
 	// [1] next all station of the train
@@ -193,7 +200,7 @@ void slave_receive_data(int link_information_buffer[5], int **trains_information
 	// [5] status of the train
 	// [6] global index of the train
 	for (i = 0 ; i < num_trains; i++) {
-		MPI_Recv(&trains_information_buffer[i], 7, MPI_INTEGER, MASTER_ID, i, MPI_COMM_WORLD, &status);
+		MPI_Recv(&trains_information_buffer[i], 7, MPI_INT, MASTER_ID, i, MPI_COMM_WORLD, &status);
 	}
 }
 
@@ -252,9 +259,9 @@ void slave_compute(int link_information_buffer[], int **trains_information_buffe
  **/
 void slave_send_result(int link_information_buffer[], int train_to_return[], int link_info_size, int train_to_return_size) {
     // Send the Train info
-    MPI_Send(link_information_buffer, train_to_return_size, MPI_INTEGER, MASTER_ID, TRAIN_INFORMATION_TAG, MPI_COMM_WORLD);
+    MPI_Send(link_information_buffer, train_to_return_size, MPI_INT, MASTER_ID, TRAIN_INFORMATION_TAG, MPI_COMM_WORLD);
     // Send the Link info
-    MPI_Send(link_information_buffer, link_info_size, MPI_INTEGER, MASTER_ID, LINK_INFORMATION_TAG, MPI_COMM_WORLD);
+    MPI_Send(link_information_buffer, link_info_size, MPI_INT, MASTER_ID, LINK_INFORMATION_TAG, MPI_COMM_WORLD);
 }
 
 /**
@@ -294,7 +301,7 @@ void master_distribute(int S, int **links_status, struct train_type trains[], in
 	int slave_id = 0;
 	int num_links;
 	// Send link statuses to the slaves
-	printf("+++ MASTER: Now sending over link statuses to the slaves.");
+    fprintf(stderr, "+++ Master: Now sending link informations to slaves.\n");
     for (row_id = 0; row_id < S; row_id++) {
         for (col_id = 0; col_id < S; col_id++) {
             // A link exists between station: row_id and station: col_id
@@ -305,14 +312,18 @@ void master_distribute(int S, int **links_status, struct train_type trains[], in
                 // [2] link status
                 // [3] link transit time
 				// [4] num trains
+                if (slave_id == 3) { //TODO: Remove this. This is put in place to denoise the console (to only have 3 slave threads)
+                    break;
+                }
                 int link_information[5] = {row_id, col_id, links_status[row_id][col_id], link_transit_time[row_id][col_id], num_trains};
-                MPI_Send(link_information, 5, MPI_INTEGER, slave_id, 1, MPI_COMM_WORLD);
+                MPI_Send(link_information, 5, MPI_INT, slave_id, 1, MPI_COMM_WORLD);
+                fprintf(stderr, "+++ MASTER: Sent link information to slave: %d\n", slave_id);
                 slave_id++;
             }
         }
     }
 	// Send over the list of trains to the slaves
-    printf("+++ MASTER: Now sending all the trains to the slaves.");
+    fprintf(stderr, "+++ MASTER: Sending all %d trains to the slaves.\n", num_trains);
     num_links = slave_id;		// note(lowjiansheng): The number of links is the same as the number of slaves.
     slave_id = 0;
 	// Send to slave thread an array containing information about the link. 
@@ -340,7 +351,7 @@ void master_distribute(int S, int **links_status, struct train_type trains[], in
 		}
         int train_status[7] = { current_station, next_station, trains[i].line, trains[i].loading_time, trains[i].transit_time, trains[i].status, i};
         for (slave_id = 0; slave_id < num_links; slave_id++) {
-            MPI_Send(train_status, 7, MPI_INTEGER, slave_id, i, MPI_COMM_WORLD);
+            MPI_Send(train_status, 7, MPI_INT, slave_id, i, MPI_COMM_WORLD);
         }
     }
 }
@@ -360,8 +371,8 @@ void master_receive_result(int S, int station_status[], int **link_status, int *
 	// Wait for an array describing the only train that has been modified by the link. 
 	// note(lowjiansheng): The tag_id will be the slave_id as each slave will only return 1 train that has been modified.
 	for (slave_id = 0 ; slave_id < slaves; slave_id++) {
-        MPI_Recv(&train_information_buffer, 7, MPI_INTEGER, slave_id, TRAIN_INFORMATION_TAG, MPI_COMM_WORLD, &status);
-		MPI_Recv(&link_information_buffer, 5, MPI_INTEGER, slave_id, LINK_INFORMATION_TAG, MPI_COMM_WORLD, &status);
+        MPI_Recv(&train_information_buffer, 7, MPI_INT, slave_id, TRAIN_INFORMATION_TAG, MPI_COMM_WORLD, &status);
+		MPI_Recv(&link_information_buffer, 5, MPI_INT, slave_id, LINK_INFORMATION_TAG, MPI_COMM_WORLD, &status);
 
         // note(Marx): if train_information buffer[0] is < 0 there is no update in the link. We do not have to do anything.
         if (train_information_buffer[0] < 0) {
@@ -623,9 +634,9 @@ void master() {
     value = strtok(NULL, delimiter);
     int b = atoi(value);
     fclose(fptr);
-    
+    num_trains = g + y + b;
     //---------------------------- PARSING INPUT FROM THE INPUT FILE. -------------------------------//
-
+    fprintf(stderr, " ~~~~~~~~~~~~~~~~~~~~~~~~ Master done parsing input file. With num trains: %d\n", num_trains);
     //---------------------------- INITIALISATION OF STATUS TRACKING ARRAYS -------------------------------//
 	
 	// INITIALISATION of link statuses.
@@ -721,7 +732,7 @@ void master() {
     clock_t before = clock();
     int msec;
     //---------------------------- INITIALISATION OF STATUS TRACKING ARRAYS -------------------------------//
-
+    fprintf(stderr, " ~~~~~~~~~~~~~~~~~~~~~~~~ Master done Initializing network \n");
     // STEP 0: ---------------------------- START NETWORK ----------------------------
     for (time_tick = 0; time_tick < N; time_tick++) {
 		// STEP 1: ---------------------------- INTRODUCE TRAINS ----------------------------
@@ -769,6 +780,7 @@ void master() {
         // Initialize parallel parameters
 
 		// Distribute data to slaves
+        fprintf(stderr, " ~~~~~~~~~~~~~~~~~~~~~~~~ Time tick: %d | Master distributing parallel code\n", time_tick);
 		master_distribute(S, links_status, trains, num_all_trains, link_transit_time, G, Y, B, all_stations_list);
 		// Gather results from slaves
 		master_receive_result(S, station_status, links_status, link_transit_time, trains, G, Y, B, all_stations_list, green_stations, yellow_stations, blue_stations);
@@ -878,7 +890,6 @@ void master() {
 
 
 /*************************************************************************************************************************************/
-
 /**
  * Train network using master-slave paradigm
  * The master initializes and sends the data to the 
@@ -895,7 +906,6 @@ int main(int argc, char ** argv)
 
 	// One master and nprocs-1 slaves
 	slaves = nprocs - 1;
-
 	if (myid == MASTER_ID) {
 		fprintf(stderr, " +++ Process %d is master\n", myid);
 		master();
