@@ -895,7 +895,7 @@ void master() {
 
         // Any train that is currently loading, decrement their loading time.
         for (i = 0 ; i < num_all_trains; i++){
-            if (trains[j].status == NOT_IN_NETWORK) {
+            if (trains[i].status == NOT_IN_NETWORK) {
                 continue;
             }
             int **line_stations;
@@ -917,7 +917,8 @@ void master() {
                 num_line_stations = y;
                 all_stations_index = get_all_station_index(num_all_trains, trains[i].station, Y, all_stations_list);
             }
-            fprintf(stderr, "Train %d = transittime = %d\n", i, trains[i].transit_time);
+            fprintf(stderr, "Train %d\n", i);
+            fprintf(stderr, "Train %d = transittime = %d, loadingtime %d\n", i, trains[i].transit_time, trains[i].loading_time);
             if (trains[i].loading_time > FINISHED_LOADING) {
                 trains[i].loading_time--;
                 if (trains[i].loading_time == FINISHED_LOADING){
