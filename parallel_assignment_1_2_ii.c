@@ -90,7 +90,7 @@ int get_all_station_index(int num_stations, int line_station_index, char *line_s
 int get_next_station(int prev_station, int direction, int num_stations);
 
 // Function Declarations: MPI related
-void slave_receive_data(int link_information_buffer[], int **trains_information_buffer);
+int** slave_receive_data(int link_information_buffer[], int **trains_information_buffer);
 void slave_compute(int link_information_buffer[], int **trains_information_buffer, int train_to_return[]);
 void slave_send_result(int link_information_buffer[], int train_to_return[], int link_info_size, int train_to_return_size);
 void slave();
@@ -169,7 +169,8 @@ int get_next_station(int prev_station, int direction, int num_stations) {
  * Each slave receives a MSG_LINK_STATUS_buffer which is an array containing value of the link
  * and a num_slaves x 6 matrix containing information of the train in the network
  **/
-void slave_receive_data(int link_information_buffer[], int **trains_information_buffer) {
+// note(lowjiansheng): slave is receiving data well
+int** slave_receive_data(int link_information_buffer[], int **trains_information_buffer) {
     // [0] row_id, aka starting station
     // [1] col_id, aka destination station
     // [2] link status or train index
@@ -182,15 +183,13 @@ void slave_receive_data(int link_information_buffer[], int **trains_information_
 	MPI_Recv(link_information_buffer, 5, MPI_INT, MASTER_ID, 1, MPI_COMM_WORLD, &status);
     num_trains = link_information_buffer[4];
     fprintf(stderr, "--- Slave %d received link information. Num trains: %d\n", myid, num_trains);
-
-    //TODO: The code is not getting past the below for loop.
+    trains_information_buffer = (int **)malloc(num_trains * sizeof(int*));
+    // TODO: The code is not getting past the below for loop.
     // This is because of how trains_information_buffer is initialized.
     // Look to the slave() function to try and debug.
 	for (i = 0 ; i < num_trains; i++){
-		trains_information_buffer[i] = (int*)(7 * sizeof(int));
-        fprintf(stderr, "--- HELLO WORLD IM HERE %d\n", i);
+		trains_information_buffer[i] = (int*)malloc(7 * sizeof(int));
 	}
-    fprintf(stderr, "--- HELLO WORLD\n");
 	// Receiving a 7 * num_trains array containing information about the trains.
 	// [0] current all station of the train
 	// [1] next all station of the train
@@ -200,25 +199,52 @@ void slave_receive_data(int link_information_buffer[], int **trains_information_
 	// [5] status of the train
 	// [6] global index of the train
 	for (i = 0 ; i < num_trains; i++) {
-		MPI_Recv(&trains_information_buffer[i], 7, MPI_INT, MASTER_ID, i, MPI_COMM_WORLD, &status);
+		MPI_Recv(trains_information_buffer[i], 7, MPI_INT, MASTER_ID, i, MPI_COMM_WORLD, &status);
 	}
+    return trains_information_buffer;
+    // CONFIRMING RESULTS.
+    /*
+    for (i = 0 ; i < num_trains; i++){
+        fprintf(stderr, "%d %d %d %d %d %d %d\n", trains_information_buffer[i][0],
+                                                    trains_information_buffer[i][1],
+                                                    trains_information_buffer[i][2],
+                                                    trains_information_buffer[i][3],
+                                                    trains_information_buffer[i][4],
+                                                    trains_information_buffer[i][5],
+                                                    trains_information_buffer[i][6]);
+    }*/
 }
 
 /** 
  * Function used by the slaves to compute the update to the network.
  **/
 void slave_compute(int link_information_buffer[], int **trains_information_buffer, int train_to_return[]) {
-	// there are no trains in the link, so loop through the trains to find one that can enter.
-	if (link_information_buffer[2] == LINK_IS_EMPTY){
+    fprintf(stderr, "Slave %d computing results now!\n", myid);
+	fprintf(stderr, "Getting link information buffer... : %d for slave %d\n", link_information_buffer[2], myid);
+    // there are no trains in the link, so loop through the trains to find one that can enter.
+	if (link_information_buffer[2] == READY_TO_LOAD){
+        //fprintf(stderr, "Testing...\n");
 		int num_trains = link_information_buffer[4];
 		int i;
 		// TODO(lowjiansheng): Probably need to randomize, this current implementation WILL cause starvation.
 		for (i = 0 ; i < num_trains ; i++) {
-			if (trains_information_buffer[i][MSG_TRAIN_CURRENT_STATION] == link_information_buffer[MSG_LINK_ROW_ID] && // Train current station is link's (from)
+            //fprintf(stderr, "Slave %d going through i = %d\n",myid, i);
+            //fprintf(stderr, "%d\n", trains_information_buffer[i][0]);
+            /*
+            fprintf(stderr, "%d %d %d %d %d %d %d\n", trains_information_buffer[i][0],
+                                                        trains_information_buffer[i][1],
+                                                        trains_information_buffer[i][2],
+                                                        trains_information_buffer[i][3],
+                                                        trains_information_buffer[i][4],
+                                                        trains_information_buffer[i][5],
+                                                        trains_information_buffer[i][6]);
+			*/
+            if (trains_information_buffer[i][MSG_TRAIN_CURRENT_STATION] == link_information_buffer[MSG_LINK_ROW_ID] && // Train current station is link's (from)
 				trains_information_buffer[i][MSG_TRAIN_NEXT_STATION] == link_information_buffer[MSG_LINK_COL_ID] &&  // Train next station is link's (to)
 				trains_information_buffer[i][MSG_TRAIN_STATUS] == IN_STATION && // Train in station
 				trains_information_buffer[i][MSG_TRAIN_LOADING_TIME] == FINISHED_LOADING) { // Train has finished loading in station and is ready to move up a link
-				train_to_return[0] = trains_information_buffer[i][MSG_TRAIN_GLOBAL];
+                fprintf(stderr, "Slave %d got here at i = %d\n", myid, i);
+                train_to_return[0] = trains_information_buffer[i][MSG_TRAIN_GLOBAL];
 				train_to_return[1] = IN_TRANSIT;
 				train_to_return[2] = link_information_buffer[MSG_LINK_TRANSIT_TIME];
 				// Setting the link to store global index of train. Remember to return this to master and store.
@@ -251,6 +277,7 @@ void slave_compute(int link_information_buffer[], int **trains_information_buffe
 			link_information_buffer[MSG_LINK_STATUS] = LINK_IS_EMPTY;
 		}
 	}
+    fprintf(stderr, "Finished computing results.\n");
     return;
 }
 
@@ -259,9 +286,11 @@ void slave_compute(int link_information_buffer[], int **trains_information_buffe
  **/
 void slave_send_result(int link_information_buffer[], int train_to_return[], int link_info_size, int train_to_return_size) {
     // Send the Train info
+    fprintf(stderr, "Slave sending results NOW~!\n");
     MPI_Send(link_information_buffer, train_to_return_size, MPI_INT, MASTER_ID, TRAIN_INFORMATION_TAG, MPI_COMM_WORLD);
     // Send the Link info
     MPI_Send(link_information_buffer, link_info_size, MPI_INT, MASTER_ID, LINK_INFORMATION_TAG, MPI_COMM_WORLD);
+    fprintf(stderr, "Slave %d finished sending results back to master.\n",myid);
 }
 
 /**
@@ -279,7 +308,21 @@ void slave() {
 	int train_to_return[train_to_return_size];
 
 	// Receive data
-	slave_receive_data(link_information_buffer, trains_information_buffer);
+	trains_information_buffer = slave_receive_data(link_information_buffer, trains_information_buffer);
+    int i;
+    int num_trains = link_information_buffer[4];
+    //fprintf(stderr, "Confirming results.\n");
+    /*
+    for (i = 0 ; i < num_trains; i++){
+        fprintf(stderr, "%d %d %d %d %d %d %d\n", trains_information_buffer[i][0],
+                                                    trains_information_buffer[i][1],
+                                                    trains_information_buffer[i][2],
+                                                    trains_information_buffer[i][3],
+                                                    trains_information_buffer[i][4],
+                                                    trains_information_buffer[i][5],
+                                                    trains_information_buffer[i][6]);
+    }
+    */
 
 	// Doing the computations
 	slave_compute(link_information_buffer, trains_information_buffer, train_to_return);
@@ -366,14 +409,28 @@ void master_receive_result(int S, int station_status[], int **link_status, int *
 	int i, j;
 	int slave_id = 0;
 	int link_information_buffer[5];
-	int train_information_buffer[3];
+	int train_information_buffer[7];
 
+    fprintf(stderr, "slaves = %d\n", slaves - 1);
 	// Wait for an array describing the only train that has been modified by the link. 
 	// note(lowjiansheng): The tag_id will be the slave_id as each slave will only return 1 train that has been modified.
-	for (slave_id = 0 ; slave_id < slaves; slave_id++) {
+    for (slave_id = 0 ; slave_id < slaves - 1; slave_id++) {
+        fprintf(stderr, "Can i receive some results? %d\n", slave_id);
         MPI_Recv(&train_information_buffer, 7, MPI_INT, slave_id, TRAIN_INFORMATION_TAG, MPI_COMM_WORLD, &status);
 		MPI_Recv(&link_information_buffer, 5, MPI_INT, slave_id, LINK_INFORMATION_TAG, MPI_COMM_WORLD, &status);
+        fprintf(stderr, "RECEIVED....!!!!!!!!!!!!!\n");
+        /*
+        for (i = 0 ; i < 7 ; i++){
+            fprintf(stderr, "%d", train_information_buffer[i]);
+        }
+        fprintf(stderr, "\n");
+        fprintf(stderr, "NOW PRINTING LINK\n");
 
+        for (i = 0 ; i < 5 ; i++){
+            fprintf(stderr, "%d", link_information_buffer[i]);
+        }
+        fprintf(stderr, "\n");
+        */
         // note(Marx): if train_information buffer[0] is < 0 there is no update in the link. We do not have to do anything.
         if (train_information_buffer[0] < 0) {
             continue;
@@ -381,6 +438,7 @@ void master_receive_result(int S, int station_status[], int **link_status, int *
         
         //---------------------------- UPDATE TRAINS -------------------------------//
         int train_index = train_information_buffer[0];
+        fprintf(stderr, "train index : %d\n", train_index);
         int train_status = train_information_buffer[1];
         int train_transit_time = train_information_buffer[2];
 
@@ -424,6 +482,7 @@ void master_receive_result(int S, int station_status[], int **link_status, int *
         } 
         // Case 3: Train just got onto the link
         else {
+            fprintf(stderr, "GETTING UP ONTO THE LINK?\n");
             int current_station = trains[train_index].station;
             int **line_stations;
 			char **line_stations_names;
@@ -447,7 +506,7 @@ void master_receive_result(int S, int station_status[], int **link_status, int *
         }
         //---------------------------- UPDATE LINKS -------------------------------//
 		link_status[link_information_buffer[MSG_LINK_ROW_ID]][link_information_buffer[MSG_LINK_COL_ID]] = link_information_buffer[MSG_LINK_STATUS];
-	}
+    }
 }
 
 /**
@@ -793,6 +852,7 @@ void master() {
         // Go through all the trains. If a train is in a station and not yet loaded, check the station status.
         // If the station is without any train loading, load it. 
         // note(lowjiansheng): At the parallel code, have to make sure to change station status to READY_TO_LOAD
+        fprintf(stderr, "FINISHED MASTER STUFF\n");
         for (i = 0 ; i < num_all_trains; i++) {
             int **line_stations;
 			int all_stations_index;
@@ -830,6 +890,7 @@ void master() {
                 }
             }
         } 
+        fprintf(stderr, "FINISHED train and lines sync\n");
 		// Go through all the stations that are ready to load and load a train onto it.
 		for (i = 0 ; i < S; i++) {
 			if (station_status[i] == READY_TO_LOAD){
