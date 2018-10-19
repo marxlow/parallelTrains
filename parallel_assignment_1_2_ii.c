@@ -334,9 +334,9 @@ void master_distribute(int S, int **links_status, struct train_type trains[], in
                 // [2] link status
                 // [3] link transit time
 				// [4] num trains
-                if (slave_id == 3) { //TODO: Remove this. This is put in place to denoise the console (to only have 3 slave threads)
-                    break;
-                }
+                //if (slave_id == 3) { //TODO: Remove this. This is put in place to denoise the console (to only have 3 slave threads)
+                //    break;
+                //}
                 int link_information[5] = {row_id, col_id, links_status[row_id][col_id], link_transit_time[row_id][col_id], num_trains};
                 MPI_Send(link_information, 5, MPI_INT, slave_id, 1, MPI_COMM_WORLD);
                 fprintf(stderr, "+++ MASTER: Sent link information[%d, %d] to slave: %d\n", row_id, col_id, slave_id);
@@ -438,10 +438,18 @@ void master_receive_result(int S, int station_status[], int **link_status, int *
             }
             line_stations[next_direction][next_station] = train_index;
             trains[train_index].transit_time = 0;
-            trains[train_index].direction = next_direction;
+            // trains[train_index].direction = next_direction;
             trains[train_index].station = next_station;
             trains[train_index].status = IN_STATION;
             trains[train_index].loading_time = WAITING_TO_LOAD;
+
+            next_station = get_next_station(next_station, trains[train_index].direction, num_stations);
+            if (prev_station < next_station) {
+                next_direction = RIGHT;
+            } else {
+                next_direction = LEFT;
+            }
+            trains[train_index].direction = next_direction;
         } 
         // Case 3: Train just got onto the link
         else {
@@ -883,7 +891,7 @@ void master() {
                 num_line_stations = y;
                 all_stations_index = get_all_station_index(num_all_trains, trains[i].station, Y, all_stations_list);
             }
-            fprintf(stderr, "~~~~~ Train %d | transittime = %d | loadingtime %d | station: %d | status: %d~~~~~\n", i, trains[i].transit_time, trains[i].loading_time, trains[i].station, trains[i].status);
+            fprintf(stderr, "~~~~~ Train %d | transittime = %d | loadingtime %d | station: %d | status: %d | direction: %d~~~~~\n", i, trains[i].transit_time, trains[i].loading_time, trains[i].station, trains[i].status, trains[i].direction);
             if (trains[i].loading_time > FINISHED_LOADING) {
                 trains[i].loading_time--;
                 if (trains[i].loading_time == FINISHED_LOADING){
