@@ -1,9 +1,9 @@
 8
 changi,tampines,clementi,downtown,chinatown,harborfront,bedok,tuas
 0 3 0 0 0 0 0 0
-3 0 0 6 0 0 0 0
+3 0 0 0 0 0 0 0
 0 0 0 0 0 0 0 0
-0 6 0 0 0 0 0 0
+0 0 0 0 0 0 0 0
 0 0 0 0 0 0 0 0
 0 0 0 0 0 0 0 0
 0 0 0 0 0 0 0 0
@@ -13,4 +13,4 @@ tuas,clementi,tampines,changi
 bedok,chinatown,clementi,tampines,harborfront
 changi,tampines,downtown,harborfront
 100
-20,20,21
+20,20,20
