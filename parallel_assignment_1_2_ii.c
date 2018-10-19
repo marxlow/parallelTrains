@@ -17,6 +17,7 @@
 #define IN_TRANSIT 1
 #define IN_STATION 0
 #define NOT_IN_NETWORK -1
+
 #define GREEN 0
 #define BLUE 1
 #define YELLOW 2
@@ -116,15 +117,7 @@ void introduce_train_into_network(struct train_type *train, double all_stations_
         }
         train->status = IN_STATION;
         train->station = starting_station;
-        if (line_stations[train->direction][starting_station] == UNVISITED) {
-            line_stations[train->direction][starting_station] = READY_TO_LOAD;
-        }        
-        // If no trains are loading. We will start loading the introduced train immediately.
-        if (line_stations[train->direction][starting_station] == READY_TO_LOAD) {
-            line_stations[train->direction][starting_station] = train_number;                // The train number is the global train index. 
-            int global_station_index = get_all_station_index(num_network_train_stations, train->station, line_stations_name_list, all_stations_list);
-            train->loading_time = calculate_loadtime(all_stations_popularity_list[global_station_index]) - 1; 
-        }
+        train->loading_time = WAITING_TO_LOAD;
     }
 }
 
@@ -181,7 +174,7 @@ int** slave_receive_data(int link_information_buffer[], int **trains_information
 	// Receiving information regarding the status of the link.
 	MPI_Recv(link_information_buffer, 5, MPI_INT, MASTER_ID, 1, MPI_COMM_WORLD, &status);
     num_trains = link_information_buffer[4];
-    fprintf(stderr, "--- Slave %d received link information. Num trains: %d\n", myid, num_trains);
+    // fprintf(stderr, "--- Slave %d received link information. Num trains: %d\n", myid, num_trains);
     trains_information_buffer = (int **)malloc(num_trains * sizeof(int*));
     // TODO: The code is not getting past the below for loop.
     // This is because of how trains_information_buffer is initialized.
@@ -218,7 +211,7 @@ int** slave_receive_data(int link_information_buffer[], int **trains_information
  * Function used by the slaves to compute the update to the network.
  **/
 void slave_compute(int link_information_buffer[], int **trains_information_buffer, int train_to_return[]) {
-	fprintf(stderr, "Getting link information buffer... : %d for slave %d\n", link_information_buffer[2], myid);
+	// fprintf(stderr, "Getting link information buffer... : %d for slave %d\n", link_information_buffer[2], myid);
     // there are no trains in the link, so loop through the trains to find one that can enter.
     train_to_return[0] = -1; // Set this to -1 to indicate that initially no train is entering the link
 	if (link_information_buffer[2] == READY_TO_LOAD){
@@ -242,7 +235,7 @@ void slave_compute(int link_information_buffer[], int **trains_information_buffe
 				trains_information_buffer[i][MSG_TRAIN_NEXT_STATION] == link_information_buffer[MSG_LINK_COL_ID] &&  // Train next station is link's (to)
 				trains_information_buffer[i][MSG_TRAIN_STATUS] == IN_STATION && // Train in station
 				trains_information_buffer[i][MSG_TRAIN_LOADING_TIME] == FINISHED_LOADING) { // Train has finished loading in station and is ready to move up a link
-                fprintf(stderr, "Slave %d got here at i = %d, Global index of train is: %d\n", myid, i, trains_information_buffer[i][MSG_TRAIN_GLOBAL]);
+                // fprintf(stderr, "Slave %d got here at i = %d, Global index of train is: %d\n", myid, i, trains_information_buffer[i][MSG_TRAIN_GLOBAL]);
                 train_to_return[0] = trains_information_buffer[i][MSG_TRAIN_GLOBAL];
 				train_to_return[1] = IN_TRANSIT;
 				train_to_return[2] = link_information_buffer[MSG_LINK_TRANSIT_TIME];
@@ -285,7 +278,7 @@ void slave_send_result(int link_information_buffer[], int train_to_return[], int
     MPI_Send(train_to_return, train_to_return_size, MPI_INT, MASTER_ID, TRAIN_INFORMATION_TAG, MPI_COMM_WORLD);
     // Send the Link info
     MPI_Send(link_information_buffer, link_info_size, MPI_INT, MASTER_ID, LINK_INFORMATION_TAG, MPI_COMM_WORLD);
-    fprintf(stderr, "Slave %d finished sending results back to master.\n",myid);
+    // fprintf(stderr, "Slave %d finished sending results back to master.\n",myid);
 }
 
 /**
@@ -304,7 +297,7 @@ void slave() {
     int time_tick = 0;
 	// Receive data
     while (1){
-        fprintf(stderr, "Slave %d is at timetick = %d.\n", myid, time_tick);
+        // fprintf(stderr, "Slave %d is at timetick = %d.\n", myid, time_tick);
         trains_information_buffer = slave_receive_data(link_information_buffer, trains_information_buffer);
         // Doing the computations
         slave_compute(link_information_buffer, trains_information_buffer, train_to_return);
@@ -397,34 +390,18 @@ void master_receive_result(int S, int station_status[], int **link_status, int *
 	int link_information_buffer[5];
 	int train_information_buffer[7];
 
-    fprintf(stderr, "slaves = %d\n", slaves - 1);
 	// Wait for an array describing the only train that has been modified by the link. 
 	// note(lowjiansheng): The tag_id will be the slave_id as each slave will only return 1 train that has been modified.
     for (slave_id = 0 ; slave_id < slaves - 1; slave_id++) {
-        // fprintf(stderr, "Can i receive some results? %d\n", slave_id);
         MPI_Recv(&train_information_buffer, 7, MPI_INT, slave_id, TRAIN_INFORMATION_TAG, MPI_COMM_WORLD, &status);
 		MPI_Recv(&link_information_buffer, 5, MPI_INT, slave_id, LINK_INFORMATION_TAG, MPI_COMM_WORLD, &status);
-        // fprintf(stderr, "RECEIVED....!!!!!!!!!!!!!\n");
-        /*
-        for (i = 0 ; i < 7 ; i++){
-            fprintf(stderr, "%d", train_information_buffer[i]);
-        }
-        fprintf(stderr, "\n");
-        fprintf(stderr, "NOW PRINTING LINK\n");
 
-        for (i = 0 ; i < 5 ; i++){
-            fprintf(stderr, "%d", link_information_buffer[i]);
-        }
-        fprintf(stderr, "\n");
-        */
-        // note(Marx): if train_information buffer[0] is < 0 there is no update in the link. We do not have to do anything.
+        // Indication that there is no update from slaves.
         if (train_information_buffer[0] < 0) {
             continue;
         }
-        
         //---------------------------- UPDATE TRAINS -------------------------------//
         int train_index = train_information_buffer[0];
-        fprintf(stderr, "train index : %d\n", train_index);
         int train_status = train_information_buffer[1];
         int train_transit_time = train_information_buffer[2];
 
@@ -444,7 +421,7 @@ void master_receive_result(int S, int station_status[], int **link_status, int *
             if (trains[train_index].line == GREEN) {
                 num_stations = num_green_stations;
                 line_stations = green_stations;
-            } else if (trains[i].line == BLUE) {
+            } else if (trains[train_index].line == BLUE) {
                 num_stations = num_blue_stations;
                 line_stations = blue_stations;
             } else {
@@ -468,7 +445,6 @@ void master_receive_result(int S, int station_status[], int **link_status, int *
         } 
         // Case 3: Train just got onto the link
         else {
-            fprintf(stderr, "Train %d getting up on the link\n", train_index);
             int current_station = trains[train_index].station;
             int **line_stations;
 			char **line_stations_names;
@@ -489,7 +465,6 @@ void master_receive_result(int S, int station_status[], int **link_status, int *
             // line_stations[current_direction][current_station] = READY_TO_LOAD;
             trains[train_index].status = train_status;
             trains[train_index].transit_time = train_transit_time;
-            fprintf(stderr, "Train %d finished getting up on the link\n", train_index);
         }
         //---------------------------- UPDATE LINKS -------------------------------//
 		link_status[link_information_buffer[MSG_LINK_ROW_ID]][link_information_buffer[MSG_LINK_COL_ID]] = link_information_buffer[MSG_LINK_STATUS];
@@ -823,22 +798,13 @@ void master() {
         }
 		
 		// STEP 2: ---------------------------- PARALLEL (Update Links) ----------------------------
-        // 1. Pick up trains from stations and put them onto any empty link.
-        // 2. Decrease travelling time in the link if the link is occupied.
-        // 3. When travelling time decreased to 0, move train into station.
-        // Initialize parallel parameters
-
 		// Distribute data to slaves
         fprintf(stderr, " ~~~~~~~~~~~~~~~~~~~~~~~~ Time tick: %d | Master distributing parallel code\n", time_tick);
 		master_distribute(S, links_status, trains, num_all_trains, link_transit_time, G, Y, B, all_stations_list);
 		// Gather results from slaves
 		master_receive_result(S, station_status, links_status, link_transit_time, trains, G, Y, B, all_stations_list, green_stations, yellow_stations, blue_stations);
-		
-        // MASTER THREAD.
-        // 1. For every station, choose train that has not loaded yet to load. (Maybe use a queue or randomize.)
-        // 2. For every station that has a train which is loading, decrement the loading time. 
-        // 3. Count the waiting times of stations.
-        // LOADING TRAINS IN STATIONS THAT ARE FREE.
+
+        // STEP 3: ---------------------------- MASTER (Load trains into empty stations) ----------------------------
         for (i = 0 ; i < S; i++) {
             if (station_status[i] == READY_TO_LOAD) {
                 for (j = 0 ; j < num_all_trains; j++) {
@@ -858,17 +824,18 @@ void master() {
                     else {
                         line_stations = yellow_stations;
                         all_stations_index = get_all_station_index(num_all_trains, trains[j].station, Y, all_stations_list);
-                    }	
+                    }
+                    // Trains starts to load in station	
                     if (all_stations_index == i && trains[j].status == IN_STATION && trains[j].loading_time == WAITING_TO_LOAD){
                         station_status[i] = LOADING;
                         line_stations[trains[j].direction][trains[j].station] = LOADING;
                         // TODO(lowjiansheng): Put in the correct load time.
-                        trains[j].loading_time = calculate_loadtime(123);
+                        trains[j].loading_time = calculate_loadtime(all_stations_popularity_list[all_stations_index]);
                     }
                 }
             }
         }
-        // Count the waiting times of stations.
+        // STEP 4: ---------------------------- MASTER (Count stations that are idle in this iteration) ----------------------------
         for (i = 0; i < 2; i++) {
             char *c;
             if (i == 0) {
@@ -893,7 +860,7 @@ void master() {
             }
         }
 
-        // Any train that is currently loading, decrement their loading time.
+        // STEP 4: ---------------------------- MASTER (Decrement loading time of trains in stations) ----------------------------
         for (i = 0 ; i < num_all_trains; i++){
             if (trains[i].status == NOT_IN_NETWORK) {
                 continue;
@@ -909,7 +876,6 @@ void master() {
             else if (trains[i].line == BLUE) {
                 line_stations = blue_stations;
                 num_line_stations = b;
-                fprintf(stderr, "Station = %d\n", trains[i].station);
                 all_stations_index = get_all_station_index(num_all_trains, trains[i].station, B, all_stations_list);
             }
             else {
@@ -917,8 +883,7 @@ void master() {
                 num_line_stations = y;
                 all_stations_index = get_all_station_index(num_all_trains, trains[i].station, Y, all_stations_list);
             }
-            fprintf(stderr, "Train %d\n", i);
-            fprintf(stderr, "Train %d = transittime = %d, loadingtime %d\n", i, trains[i].transit_time, trains[i].loading_time);
+            fprintf(stderr, "~~~~~ Train %d | transittime = %d | loadingtime %d | station: %d | status: %d~~~~~\n", i, trains[i].transit_time, trains[i].loading_time, trains[i].station, trains[i].status);
             if (trains[i].loading_time > FINISHED_LOADING) {
                 trains[i].loading_time--;
                 if (trains[i].loading_time == FINISHED_LOADING){
@@ -926,20 +891,21 @@ void master() {
                     line_stations[trains[i].direction][trains[i].station] = READY_TO_LOAD;
                 }
             }
-            // MOVE THE TRAINS FROM TRANSIT INTO STATIONS
-            else if (trains[i].status == IN_TRANSIT && trains[i].transit_time == 0) {
-                int prev_station = trains[i].station;
-                trains[i].station = get_next_station(trains[i].station, trains[i].direction, num_line_stations);
-                // Move the train to the next station
-                // Update the direction of the train (For trains reaching a terminal station)
-                if (prev_station < trains[i].station) {
-                    trains[i].direction = RIGHT;
-                } else {
-                    trains[i].direction = LEFT;
-                }
-                trains[i].status = IN_STATION;
-                trains[i].loading_time = WAITING_TO_LOAD;
-            }
+            // Move trains from transit into station --> ALREADY DONE AT SLAVE
+
+            // // fprintf(stderr, "\n\n Attention. Train : %d, transit time: %d, status: %d\n\n", i, trains[i].transit_time, trains[i].status);
+            // else if (trains[i].status == IN_TRANSIT && trains[i].transit_time == 0) {
+            //     // int prev_station = trains[i].station;
+            //     // trains[i].station = get_next_station(trains[i].station, trains[i].direction, num_line_stations);
+            //     // // Update the direction of the train (For trains reaching a terminal station)
+            //     // if (prev_station < trains[i].station) {
+            //     //     trains[i].direction = RIGHT;
+            //     // } else {
+            //     //     trains[i].direction = LEFT;
+            //     // }
+            //     // trains[i].status = IN_STATION;
+            //     // trains[i].loading_time = WAITING_TO_LOAD;
+            // }
         }
         
         fprintf(stderr, "FINISHED train and lines sync\n");
