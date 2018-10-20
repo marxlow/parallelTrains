@@ -4,7 +4,6 @@
 
 // ASSUMPTIONS:
 // 1. Number of processes = Number of links in the network. Else the program will not work.
-
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -12,6 +11,7 @@
 #include <assert.h>
 #include <mpi.h>
 #include <math.h>
+#include <limits.h>
 
 // Train Status
 #define IN_TRANSIT 1
@@ -88,6 +88,11 @@ void introduce_train_into_network(struct train_type *train, double all_stations_
 int calculate_loadtime(double popularity);
 int get_all_station_index(int num_stations, int line_station_index, char *line_stations[], char *all_stations_list[]);
 int get_next_station(int prev_station, int direction, int num_stations);
+void print_output(int iteration, struct train_type trains[], int num_trains, char *G[], char *Y[], char *B[], int num_green_trains, int num_yellow_trains, int num_blue_trains, char *all_stations_list[], int num_all_stations, int num_green_stations, int num_yellow_stations, int num_blue_stations, FILE* fp);
+
+// Function declaration: Calculating waiting time
+double get_average_waiting_time(int num_green_stations, int **green_station_waiting_times, int N);
+void get_longest_shortest_average_waiting_time(int num_green_stations, int **green_station_waiting_times, int N, double *longest_average_waiting_time, double *shortest_average_waiting_time);
 
 // Function Declarations: MPI related
 int** slave_receive_data(int link_information_buffer[], int **trains_information_buffer);
@@ -128,6 +133,7 @@ int calculate_loadtime(double popularity) {
     return ceil(random_number * popularity);
 }
 int get_all_station_index(int num_stations, int line_station_index, char *line_stations[], char *all_stations_list[]) {
+    // fprintf(stderr, "Current local station: %d, which is at %s\n", line_station_index, line_stations[line_station_index]);
     for (int i = 0; i < num_stations; i++) {   
         if (strcmp(line_stations[line_station_index], all_stations_list[i]) == 0) {
             return i;
@@ -152,7 +158,113 @@ int get_next_station(int prev_station, int direction, int num_stations) {
     }
     return prev_station - 1;
 }
+void print_output(int iteration, struct train_type trains[], int num_trains, char *G[], char *Y[], char *B[], int num_green_trains, int num_yellow_trains, int num_blue_trains, char *all_stations_list[], int num_all_stations, int num_green_stations, int num_yellow_stations, int num_blue_stations, FILE* fp) {
+    int i;
+    int train_index;
+    int current_station_index;
+    int prev_station_index;
 
+    fprintf(fp, "%d:", iteration);
+    // Print satus of all green trains first
+    for (i = 0; i < num_green_trains; i++) {
+        if (trains[i].status == NOT_IN_NETWORK) {
+            continue;
+        }
+        else if (trains[i].status == IN_STATION) {
+            current_station_index = get_all_station_index(num_all_stations, trains[i].station, G, all_stations_list);
+            fprintf(fp, " g%d-s%d,", i, current_station_index);
+        } 
+        else if (trains[i].status == IN_TRANSIT) {
+            prev_station_index = get_all_station_index(num_all_stations, trains[i].station, G, all_stations_list);
+            current_station_index = get_next_station(trains[i].station, trains[i].direction, num_green_stations);
+            current_station_index = get_all_station_index(num_all_stations, current_station_index, G, all_stations_list);
+            fprintf(fp, " g%d-s%d->s%d,", i, prev_station_index, current_station_index);
+        }
+    }
+
+    // Yellow
+    for (i = num_green_trains; i < num_green_trains + num_yellow_trains; i++) {
+        train_index = i - num_green_trains;
+        if (trains[i].status == NOT_IN_NETWORK) {
+            continue;
+        }
+        else if (trains[i].status == IN_STATION) {
+            current_station_index = get_all_station_index(num_all_stations, trains[i].station, Y, all_stations_list);
+            fprintf(fp, " y%d-s%d,", train_index, current_station_index);
+        } else if (trains[i].status == IN_TRANSIT) {
+            prev_station_index = get_all_station_index(num_all_stations, trains[i].station, Y, all_stations_list);
+            current_station_index = get_next_station(trains[i].station, trains[i].direction, num_yellow_stations);
+            current_station_index = get_all_station_index(num_all_stations, current_station_index, Y, all_stations_list);
+            fprintf(fp, " y%d-s%d->s%d,", train_index, prev_station_index, current_station_index);
+        }
+    }
+
+    for (i = num_green_trains + num_yellow_trains; i < num_trains; i++) {
+        train_index = i - num_green_trains - num_yellow_trains;
+        if (trains[i].status == NOT_IN_NETWORK) {
+            continue;
+        }
+        else if (trains[i].status == IN_STATION) {
+            current_station_index = get_all_station_index(num_all_stations, trains[i].station, B, all_stations_list);
+            fprintf(fp, " b%d-s%d,", train_index, current_station_index);
+        } else if (trains[i].status == IN_TRANSIT) {
+            prev_station_index = get_all_station_index(num_all_stations, trains[i].station, B, all_stations_list);
+            current_station_index = get_next_station(trains[i].station, trains[i].direction, num_blue_stations);
+            current_station_index = get_all_station_index(num_all_stations, current_station_index, B, all_stations_list);
+            fprintf(fp, " b%d-s%d->s%d,", train_index, prev_station_index, current_station_index);
+        }
+    }
+    fprintf(fp, "\n");
+}
+
+// Functions: Calculating waiting time
+double get_average_waiting_time(int num_stations, int **station_waiting_times, int N) {
+    int i;
+    int j;
+    int total_waiting_time = 0;
+    for (i = 0; i < 2; i++) {
+        for (j = 0; j < num_stations; j++) {
+            // Skip LEFT ending terminal
+            if (i == 0 && j == num_stations -1) {
+                continue;
+            }
+            // Skip RIGHT starting terminal
+            if (i == 1 && j == 0) {
+                continue;
+            }
+            total_waiting_time += station_waiting_times[i][j];
+        }
+    }
+    double average_waiting_time;
+    average_waiting_time = (double)total_waiting_time / (double)num_stations / (double)2;
+    average_waiting_time = average_waiting_time / (double)N;
+    return average_waiting_time;
+}
+void get_longest_shortest_average_waiting_time(int num_stations, int **station_waiting_times, int N, double *longest_average_waiting_time, double *shortest_average_waiting_time) {
+    int i;
+    int j;
+    for (i = 0; i < 2; i++) {
+        for (j = 0; j < num_stations; j++) {
+            // Skip LEFT ending terminal
+            if (i == 0 && j == num_stations -1) {
+                continue;
+            }
+            // Skip RIGHT starting terminal
+            if (i == 1 && j == 0) {
+                continue;
+            }
+            double waiting_time = (double)station_waiting_times[i][j];
+            double station_average_waiting_time = waiting_time / (double)N;
+            // Update waiting times
+            if (*longest_average_waiting_time < station_average_waiting_time) {
+                *longest_average_waiting_time = station_average_waiting_time;
+            }
+            if (*shortest_average_waiting_time > station_average_waiting_time) {
+                *shortest_average_waiting_time = station_average_waiting_time;
+            }
+        }
+    }
+}
 
 /*************************************************************************************************************************************/
 
@@ -212,14 +324,12 @@ int** slave_receive_data(int link_information_buffer[], int **trains_information
  * Function used by the slaves to compute the update to the network.
  **/
 void slave_compute(int link_information_buffer[], int **trains_information_buffer, int train_to_return[]) {
-	// fprintf(stderr, "Getting link information buffer... : %d for slave %d\n", link_information_buffer[2], myid);
-    // there are no trains in the link, so loop through the trains to find one that can enter.
     train_to_return[0] = -1; // Set this to -1 to indicate that initially no train is entering the link
 	if (link_information_buffer[2] == READY_TO_LOAD){
-        //fprintf(stderr, "Testing...\n");
         int num_trains = link_information_buffer[4];
+        int train_to_link_buffer[num_trains];
+        int buffer_index = 0;
 		int i;
-        // TODO(lowjiansheng): Probably need to randomize, this current implementation WILL cause starvation.
 		for (i = 0 ; i < num_trains ; i++) {
             if (trains_information_buffer[i][MSG_TRAIN_STATUS] == NOT_IN_NETWORK) {
                 continue;
@@ -235,19 +345,43 @@ void slave_compute(int link_information_buffer[], int **trains_information_buffe
                                                         trains_information_buffer[i][5],
                                                         trains_information_buffer[i][6]);
 			*/
+            // fprintf(stderr, "Slave %d got here at i = %d, Global index of train is: %d\n", myid, i, trains_information_buffer[i][MSG_TRAIN_GLOBAL]);
             if (trains_information_buffer[i][MSG_TRAIN_CURRENT_STATION] == link_information_buffer[MSG_LINK_ROW_ID] && // Train current station is link's (from)
 				trains_information_buffer[i][MSG_TRAIN_NEXT_STATION] == link_information_buffer[MSG_LINK_COL_ID] &&  // Train next station is link's (to)
 				trains_information_buffer[i][MSG_TRAIN_STATUS] == IN_STATION && // Train in station
 				trains_information_buffer[i][MSG_TRAIN_LOADING_TIME] == FINISHED_LOADING) { // Train has finished loading in station and is ready to move up a link
-                // fprintf(stderr, "Slave %d got here at i = %d, Global index of train is: %d\n", myid, i, trains_information_buffer[i][MSG_TRAIN_GLOBAL]);
-                train_to_return[0] = trains_information_buffer[i][MSG_TRAIN_GLOBAL];
-				train_to_return[1] = IN_TRANSIT;
-				train_to_return[2] = link_information_buffer[MSG_LINK_TRANSIT_TIME];
-				// Setting the link to store global index of train. Remember to return this to master and store.
-				link_information_buffer[MSG_LINK_STATUS] = trains_information_buffer[i][MSG_TRAIN_GLOBAL];
-				break;
+                // Put train index in buffer to be randomly popped
+                train_to_link_buffer[buffer_index] = i;
+                buffer_index ++;
 			}
 		}
+        // No trains are waiting to board this link.
+        if (buffer_index == 0) {
+            return;
+        } else {
+            // Initialize random number seed
+            time_t t;
+            srand((unsigned) time(&t));
+            // Get random buffer index which holds all the train index that can board the link. This will give us a random train.
+            int random_buffer_index = rand() % buffer_index;
+            int random_train_index = train_to_link_buffer[random_buffer_index];
+            // Update buffers with train & link information
+            train_to_return[0] = trains_information_buffer[random_train_index][MSG_TRAIN_GLOBAL];
+			train_to_return[1] = IN_TRANSIT;
+			train_to_return[2] = link_information_buffer[MSG_LINK_TRANSIT_TIME];
+			link_information_buffer[MSG_LINK_STATUS] = trains_information_buffer[random_train_index][MSG_TRAIN_GLOBAL];
+            // note(Marx) : Below is the debug statement to ensure a random train is chosen
+            // if (buffer_index > 1) {
+            //     fprintf(stderr, "\n\nAlert");
+            //     int i = 0;
+            //     for (i = 0; i < buffer_index; i ++) {
+            //         fprintf(stderr, " | Train %d", train_to_link_buffer[i]);
+            //     }
+            //     fprintf(stderr, " | Are waiting to board the link [%d, %d]\n", link_information_buffer[MSG_LINK_ROW_ID], link_information_buffer[MSG_LINK_COL_ID]);
+            //     fprintf(stderr, "We are randomly choosing, train index [%d] to board \n\n\n", random_train_index);
+            // }
+        }
+
 	} 
 	else if (link_information_buffer[2] == LINK_DEFAULT_STATUS){
 		printf("There is an error. Master should not be sending over a link that does not exist.\n");
@@ -343,7 +477,7 @@ void master_distribute(int S, int **links_status, struct train_type trains[], in
                 //}
                 int link_information[5] = {row_id, col_id, links_status[row_id][col_id], link_transit_time[row_id][col_id], num_trains};
                 MPI_Send(link_information, 5, MPI_INT, slave_id, 1, MPI_COMM_WORLD);
-                fprintf(stderr, "+++ MASTER: Sent link information[%d, %d] to slave: %d\n", row_id, col_id, slave_id);
+                // fprintf(stderr, "+++ MASTER: Sent link information[%d, %d] to slave: %d\n", row_id, col_id, slave_id);
                 slave_id++;
             }
         }
@@ -402,7 +536,7 @@ void master_distribute(int S, int **links_status, struct train_type trains[], in
 void master_receive_result(int S, int station_status[], int **link_status, int **link_transit_time, struct train_type trains[], char *G[], char *Y[], char *B[], char *all_stations_list[], int **green_stations, int **yellow_stations, int **blue_stations) {
 	MPI_Status status;
 	// Master waits for an array describing the train link status and an array of the train that has been modified.
-    fprintf(stderr, " +++ MASTER : Now receiving results back from the slaves\n");
+    fprintf(stderr, "+++ MASTER : Now receiving results back from the slaves\n");
 	int i, j;
 	int slave_id = 0;
 	int link_information_buffer[5];
@@ -410,11 +544,10 @@ void master_receive_result(int S, int station_status[], int **link_status, int *
 
 	// Wait for an array describing the only train that has been modified by the link. 
 	// note(lowjiansheng): The tag_id will be the slave_id as each slave will only return 1 train that has been modified.
-    for (slave_id = 0 ; slave_id < slaves - 1; slave_id++) {
+    for (slave_id = 0 ; slave_id < slaves; slave_id++) {
         MPI_Recv(&train_information_buffer, 7, MPI_INT, slave_id, TRAIN_INFORMATION_TAG, MPI_COMM_WORLD, &status);
 		MPI_Recv(&link_information_buffer, 5, MPI_INT, slave_id, LINK_INFORMATION_TAG, MPI_COMM_WORLD, &status);
-
-        // Indication that there is no update from slaves.
+        //---------------------------- NO UPDATE FROM THIS SLAVE -------------------------------//
         if (train_information_buffer[0] < 0) {
             continue;
         }
@@ -456,7 +589,6 @@ void master_receive_result(int S, int station_status[], int **link_status, int *
             }
             line_stations[next_direction][next_station] = train_index;
             trains[train_index].transit_time = 0;
-            // trains[train_index].direction = next_direction;
             trains[train_index].station = next_station;
             trains[train_index].status = IN_STATION;
             trains[train_index].loading_time = WAITING_TO_LOAD;
@@ -824,40 +956,59 @@ void master() {
         }
 		
 		// STEP 2: ---------------------------- PARALLEL (Update Links) ----------------------------
-		// Distribute data to slaves
         fprintf(stderr, " ~~~~~~~~~~~~~~~~~~~~~~~~ Time tick: %d | Master distributing parallel code\n", time_tick);
 		master_distribute(S, links_status, trains, num_all_trains, link_transit_time, G, Y, B, all_stations_list);
-		// Gather results from slaves
 		master_receive_result(S, station_status, links_status, link_transit_time, trains, G, Y, B, all_stations_list, green_stations, yellow_stations, blue_stations);
-
         // STEP 3: ---------------------------- MASTER (Load trains into empty stations) ----------------------------
         for (i = 0 ; i < S; i++) {
+            int station_trains_buffer[num_all_trains];
+            int buffer_index = 0;
+            time_t t;
+            srand((unsigned) time(&t));
             if (station_status[i] == READY_TO_LOAD) {
                 for (j = 0 ; j < num_all_trains; j++) {
                     if (trains[j].status == NOT_IN_NETWORK) {
                         continue;
                     }
-                    int **line_stations;
                     int all_stations_index;
                     if (trains[j].line == GREEN) {
-                        line_stations = green_stations;
                         all_stations_index = get_all_station_index(num_all_trains, trains[j].station, G, all_stations_list);
                     }   
                     else if (trains[j].line == BLUE) {
-                        line_stations = blue_stations;
                         all_stations_index = get_all_station_index(num_all_trains, trains[j].station, B, all_stations_list);
                     }
                     else {
-                        line_stations = yellow_stations;
                         all_stations_index = get_all_station_index(num_all_trains, trains[j].station, Y, all_stations_list);
                     }
-                    // Trains starts to load in station	
+                    // Put all trains that are waiting to load in the station to a buffer. Trains in this buffer will be randomly chosen
                     if (all_stations_index == i && trains[j].status == IN_STATION && trains[j].loading_time == WAITING_TO_LOAD){
-                        station_status[i] = LOADING;
-                        line_stations[trains[j].direction][trains[j].station] = LOADING;
-                        // TODO(lowjiansheng): Put in the correct load time.
-                        trains[j].loading_time = calculate_loadtime(all_stations_popularity_list[all_stations_index]);
+                        station_trains_buffer[buffer_index] = j;
+                        buffer_index ++;
                     }
+                }
+                // Randomly pick a train index to start loading in this station
+                if (buffer_index > 0) {
+                    int random_buffer_index = rand() % buffer_index;
+                    int random_train_index = station_trains_buffer[random_buffer_index];
+                    station_status[i] = LOADING;
+                    trains[random_train_index].loading_time = calculate_loadtime(all_stations_popularity_list[i]);
+                    if (trains[random_train_index].line == GREEN) {
+                        green_stations[trains[random_train_index].direction][trains[random_train_index].station] = LOADING;
+                    } else if (trains[random_train_index].line == BLUE) {
+                        blue_stations[trains[random_train_index].direction][trains[random_train_index].station] = LOADING;
+                    } else {
+                        yellow_stations[trains[random_train_index].direction][trains[random_train_index].station] = LOADING;
+                    }
+                    // note(Marx): Debug statement to ensure that we are allowing a random train to load here.
+                    // if (buffer_index > 1) {
+                    //     fprintf(stderr, "\n\nAlert");
+                    //     int i = 0;
+                    //     for (i = 0; i < buffer_index; i ++) {
+                    //         fprintf(stderr, " | Train %d", station_trains_buffer[i]);
+                    //     }
+                    //     fprintf(stderr, " | Are waiting to board the station [%d]\n", i);
+                    //     fprintf(stderr, "We are randomly choosing, train index [%d] to board \n\n", random_train_index);
+                    // }
                 }
             }
         }
@@ -886,7 +1037,7 @@ void master() {
             }
         }
 
-        // STEP 4: ---------------------------- MASTER (Decrement loading time of trains in stations) ----------------------------
+        // STEP 5: ---------------------------- MASTER (Decrement loading time of trains in stations) ----------------------------
         for (i = 0 ; i < num_all_trains; i++){
             if (trains[i].status == NOT_IN_NETWORK) {
                 continue;
@@ -909,7 +1060,27 @@ void master() {
                 num_line_stations = y;
                 all_stations_index = get_all_station_index(num_all_trains, trains[i].station, Y, all_stations_list);
             }
-            fprintf(stderr, "~~~~~ Train %d | transittime = %d | loadingtime %d | station: %d | status: %d | direction: %d~~~~~\n", i, trains[i].transit_time, trains[i].loading_time, trains[i].station, trains[i].status, trains[i].direction);
+            // note(Marx): This is an intense debugging session that I spent too much time on
+            // if (i == 0) {
+            //     struct train_type train = trains[i];
+            //     int temp_loading_time = train.loading_time;
+            //     int temp_transit_time = train.transit_time;
+            //     int temp_local_station = train.station;
+            //     int temp_direction = train.direction;
+            //     int temp_next_station = get_next_station(temp_local_station, temp_direction, g);
+            //     int temp_international_station = get_all_station_index(num_all_trains, trains[i].station, G, all_stations_list);
+            //     int temp_next_international_station = get_all_station_index(num_all_trains, temp_next_station, G, all_stations_list);
+            //     fprintf(stderr, "\n\nIntense debug: Train[%d] | transit time: %d | Loading time: %d | local station: %d (int[%d]) | next station: %d (int [%d])\n\n", 
+            //         i,
+            //         temp_transit_time,
+            //         temp_loading_time,
+            //         temp_local_station,
+            //         temp_international_station,
+            //         temp_next_station,
+            //         temp_next_international_station
+            //     );
+            // }
+            // fprintf(stderr, "~~~~~ Train %d | transittime = %d | loadingtime %d | local station: %d | status: %d | direction: %d~~~~~\n", i, trains[i].transit_time, trains[i].loading_time, trains[i].station, trains[i].status, trains[i].direction);
             if (trains[i].loading_time > FINISHED_LOADING) {
                 trains[i].loading_time--;
                 if (trains[i].loading_time == FINISHED_LOADING){
@@ -917,26 +1088,40 @@ void master() {
                     line_stations[trains[i].direction][trains[i].station] = READY_TO_LOAD;
                 }
             }
-            // Move trains from transit into station --> ALREADY DONE AT SLAVE
-
-            // // fprintf(stderr, "\n\n Attention. Train : %d, transit time: %d, status: %d\n\n", i, trains[i].transit_time, trains[i].status);
-            // else if (trains[i].status == IN_TRANSIT && trains[i].transit_time == 0) {
-            //     // int prev_station = trains[i].station;
-            //     // trains[i].station = get_next_station(trains[i].station, trains[i].direction, num_line_stations);
-            //     // // Update the direction of the train (For trains reaching a terminal station)
-            //     // if (prev_station < trains[i].station) {
-            //     //     trains[i].direction = RIGHT;
-            //     // } else {
-            //     //     trains[i].direction = LEFT;
-            //     // }
-            //     // trains[i].status = IN_STATION;
-            //     // trains[i].loading_time = WAITING_TO_LOAD;
-            // }
+            // The update to move trains from transit into station --> ALREADY DONE AT SLAVE
         }
-        
-        fprintf(stderr, "FINISHED train and lines sync\n");
-
+        print_output(time_tick, trains, num_all_trains, G, Y, B, g, y, b, all_stations_list, S, num_green_stations, num_yellow_stations, num_blue_stations, fp);
+        fprintf(stderr, "\n\n");
+        // fprintf(stderr, "\n\nFINISHED train and lines sync\n\n");
 	}
+    // Close clock for time
+    clock_t difference = clock() - before;
+    msec = difference * 1000 / CLOCKS_PER_SEC;
+    printf("Time taken: %d seconds %d milliseconds\n", msec/1000, msec%1000);
+
+    // Get waiting time
+    double green_longest_average_waiting_time = 0;
+    double green_shortest_average_waiting_time = INT_MAX;
+    double green_average_waiting_time = get_average_waiting_time(num_green_stations, green_station_waiting_times, N);
+    get_longest_shortest_average_waiting_time(num_green_stations, green_station_waiting_times, N, &green_longest_average_waiting_time, &green_shortest_average_waiting_time);
+
+    double yellow_longest_average_waiting_time = 0;
+    double yellow_shortest_average_waiting_time = INT_MAX;
+    double yellow_average_waiting_time = get_average_waiting_time(num_yellow_stations, yellow_station_waiting_times, N);
+    get_longest_shortest_average_waiting_time(num_yellow_stations, yellow_station_waiting_times, N, &yellow_longest_average_waiting_time, &yellow_shortest_average_waiting_time);
+    
+    double blue_longest_average_waiting_time = 0;
+    double blue_shortest_average_waiting_time = INT_MAX;
+    double blue_average_waiting_time = get_average_waiting_time(num_blue_stations, blue_station_waiting_times, N);
+    get_longest_shortest_average_waiting_time(num_blue_stations, blue_station_waiting_times, N, &blue_longest_average_waiting_time, &blue_shortest_average_waiting_time);
+    
+    fprintf(fp, "\nAverage waiting times:\n");
+    fprintf(fp, "green: %d trains -> %lf, %lf, %lf\n", g, green_average_waiting_time, green_longest_average_waiting_time, green_shortest_average_waiting_time);
+    fprintf(fp, "yellow: %d trains -> %lf, %lf, %lf\n", y, yellow_average_waiting_time, yellow_longest_average_waiting_time, yellow_shortest_average_waiting_time);
+    fprintf(fp, "blue: %d trains -> %lf, %lf, %lf", b, blue_average_waiting_time, blue_longest_average_waiting_time, blue_shortest_average_waiting_time);
+
+    // Close file for logs
+    fclose(fp);
     MPI_Abort(MPI_COMM_WORLD, 0);
 }
 
