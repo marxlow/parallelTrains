@@ -110,10 +110,10 @@ void introduce_train_into_network(struct train_type *train, double all_stations_
     if (starting_station != -1) {
         if (starting_station == 0) {
             *introduced_train_right = INTRODUCED;
-            train->direction = LEFT;
+            train->direction = RIGHT;
         } else {
             *introduced_train_left = INTRODUCED;
-            train->direction = RIGHT;
+            train->direction = LEFT;
         }
         train->status = IN_STATION;
         train->station = starting_station;
@@ -191,7 +191,8 @@ int** slave_receive_data(int link_information_buffer[], int **trains_information
 	// [5] status of the train
 	// [6] global index of the train
 	for (i = 0 ; i < num_trains; i++) {
-		MPI_Recv(trains_information_buffer[i], 7, MPI_INT, MASTER_ID, i, MPI_COMM_WORLD, &status);
+    //    fprintf(stderr, "Trying to receive train information slave : %d\n", myid);
+        MPI_Recv(trains_information_buffer[i], 7, MPI_INT, MASTER_ID, i, MPI_COMM_WORLD, &status);
 	}
     return trains_information_buffer;
     // CONFIRMING RESULTS.
@@ -216,10 +217,13 @@ void slave_compute(int link_information_buffer[], int **trains_information_buffe
     train_to_return[0] = -1; // Set this to -1 to indicate that initially no train is entering the link
 	if (link_information_buffer[2] == READY_TO_LOAD){
         //fprintf(stderr, "Testing...\n");
-		int num_trains = link_information_buffer[4];
+        int num_trains = link_information_buffer[4];
 		int i;
-		// TODO(lowjiansheng): Probably need to randomize, this current implementation WILL cause starvation.
+        // TODO(lowjiansheng): Probably need to randomize, this current implementation WILL cause starvation.
 		for (i = 0 ; i < num_trains ; i++) {
+            if (trains_information_buffer[i][MSG_TRAIN_STATUS] == NOT_IN_NETWORK) {
+                continue;
+            }
             //fprintf(stderr, "Slave %d going through i = %d\n",myid, i);
             //fprintf(stderr, "%d\n", trains_information_buffer[i][0]);
             /*
@@ -357,11 +361,24 @@ void master_distribute(int S, int **links_status, struct train_type trains[], in
 	// [5] status of the train
 	// [6] global index of the train
     for (i = 0 ; i < num_trains; i++) {
-		int current_station;
+	    //fprintf(stderr, "Doing train %d...\n", i);
+        int current_station;
 		int next_station;
-		if (trains[i].line == GREEN){
+       // fprintf(stderr, "Train status = %d\n", trains[i].status);
+       // fprintf(stderr, "NOT IN NETWORK : %d\n", NOT_IN_NETWORK);
+       // fprintf(stderr, "TRAIN LINE = %d\n", trains[i].line);
+		if (trains[i].status == NOT_IN_NETWORK) {
+          //  fprintf(stderr, "Train %d nin\n", trains[i].status);
+            current_station = -1;
+            next_station = -1;
+        }
+        else if (trains[i].line == GREEN){
+        //    fprintf(stderr, "TEST. %d\n", trains[i].station);
 			current_station = get_all_station_index(S, trains[i].station, G,  all_stations_list);
-			next_station = get_all_station_index(S, get_next_station(trains[i].station, trains[i].direction, S), G, all_stations_list);
+		//	fprintf(stderr, "GETS HERE?\n");
+        //    fprintf(stderr, "Next station = %d\n", get_next_station(trains[i].station, trains[i].direction, S));
+            next_station = get_all_station_index(S, get_next_station(trains[i].station, trains[i].direction, S), G, all_stations_list);
+        //    fprintf(stderr, "DOES NOT GET HERE.\n");
 		}
 		else if (trains[i].line == BLUE) {
 			current_station = get_all_station_index(S, trains[i].station, B,  all_stations_list);
@@ -371,6 +388,7 @@ void master_distribute(int S, int **links_status, struct train_type trains[], in
 			current_station = get_all_station_index(S, trains[i].station, Y,  all_stations_list);
 			next_station = get_all_station_index(S, get_next_station(trains[i].station, trains[i].direction, S), Y, all_stations_list);	
 		}
+        //fprintf(stderr, "Doesn't come here\n");
         int train_status[7] = { current_station, next_station, trains[i].line, trains[i].loading_time, trains[i].transit_time, trains[i].status, i};
         for (slave_id = 0; slave_id < num_links; slave_id++) {
             MPI_Send(train_status, 7, MPI_INT, slave_id, i, MPI_COMM_WORLD);
