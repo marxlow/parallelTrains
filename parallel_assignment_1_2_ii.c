@@ -965,6 +965,10 @@ void master() {
             int buffer_index = 0;
             time_t t;
             srand((unsigned) time(&t));
+            if (station_status[i] == LOADING) {
+                // note(Marx): Should expect that station 7 is here in first few iterations. but it is not
+                // fprintf(stderr, "Iteration %d. Station %d is loading\n", time_tick, i);
+            }
             if (station_status[i] == READY_TO_LOAD) {
                 for (j = 0 ; j < num_all_trains; j++) {
                     if (trains[j].status == NOT_IN_NETWORK) {
@@ -990,6 +994,7 @@ void master() {
                 if (buffer_index > 0) {
                     int random_buffer_index = rand() % buffer_index;
                     int random_train_index = station_trains_buffer[random_buffer_index];
+                    // fprintf(stderr, " Setting station %d to be loading\n", i);
                     station_status[i] = LOADING;
                     trains[random_train_index].loading_time = calculate_loadtime(all_stations_popularity_list[i]);
                     if (trains[random_train_index].line == GREEN) {
@@ -1022,6 +1027,8 @@ void master() {
             }
             for (j = 0; j < num_green_stations; j++) {
                 if (green_stations[i][j] == READY_TO_LOAD) {
+                    int station_index = get_all_station_index(num_all_trains, j, G, all_stations_list);
+                    // fprintf(stderr, "The train [%d, %d] is waiting. Global index: %d. And idle at this iteration %d\n", i, j, station_index, time_tick);
                     green_station_waiting_times[i][j] += 1;
                 }
             }
@@ -1085,14 +1092,13 @@ void master() {
                 trains[i].loading_time--;
                 if (trains[i].loading_time == FINISHED_LOADING){
                     station_status[all_stations_index] = READY_TO_LOAD;
-                    line_stations[trains[i].direction][trains[i].station] = READY_TO_LOAD;
+                    line_stations[trains[i].direction][trains[i].station] = READY_TO_LOAD; // Set station back to ready to load for counting idle time
                 }
             }
             // The update to move trains from transit into station --> ALREADY DONE AT SLAVE
         }
         print_output(time_tick, trains, num_all_trains, G, Y, B, g, y, b, all_stations_list, S, num_green_stations, num_yellow_stations, num_blue_stations, fp);
         fprintf(stderr, "\n\n");
-        // fprintf(stderr, "\n\nFINISHED train and lines sync\n\n");
 	}
     // Close clock for time
     clock_t difference = clock() - before;
