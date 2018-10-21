@@ -133,7 +133,6 @@ int calculate_loadtime(double popularity) {
     return ceil(random_number * popularity);
 }
 int get_all_station_index(int num_stations, int line_station_index, char *line_stations[], char *all_stations_list[]) {
-    // fprintf(stderr, "Current local station: %d, which is at %s\n", line_station_index, line_stations[line_station_index]);
     for (int i = 0; i < num_stations; i++) {   
         if (strcmp(line_stations[line_station_index], all_stations_list[i]) == 0) {
             return i;
@@ -142,8 +141,7 @@ int get_all_station_index(int num_stations, int line_station_index, char *line_s
     return -1; // Error return code - this is to fix the compile error that no return type is specified
 }
 int get_next_station(int prev_station, int direction, int num_stations) {
-    if (direction == RIGHT)
-    {
+    if (direction == RIGHT) {
         // Reached the end of the station
         if (prev_station == num_stations - 1)
         {
@@ -152,8 +150,7 @@ int get_next_station(int prev_station, int direction, int num_stations) {
         return prev_station + 1;
     }
     // Reached the start of the station
-    if (prev_station == 0)
-    {
+    if (prev_station == 0) {
         return 1;
     }
     return prev_station - 1;
@@ -243,16 +240,18 @@ double get_average_waiting_time(int num_stations, int **station_waiting_times, i
 void get_longest_shortest_average_waiting_time(int num_stations, int **station_waiting_times, int N, double *longest_average_waiting_time, double *shortest_average_waiting_time) {
     int i;
     int j;
+    fprintf(stderr, "Num stations: %d\n", num_stations);
     for (i = 0; i < 2; i++) {
         for (j = 0; j < num_stations; j++) {
             // Skip LEFT ending terminal
-            if (i == 0 && j == num_stations -1) {
+            if (i == 1 && j == num_stations -1) {
                 continue;
             }
             // Skip RIGHT starting terminal
-            if (i == 1 && j == 0) {
+            if (i == 0 && j == 0) {
                 continue;
             }
+            fprintf(stderr, "Station[%d,%d] waiting time: %d\n", i, j, station_waiting_times[i][j]);
             double waiting_time = (double)station_waiting_times[i][j];
             double station_average_waiting_time = waiting_time / (double)N;
             // Update waiting times
@@ -472,9 +471,6 @@ void master_distribute(int S, int **links_status, struct train_type trains[], in
                 // [2] link status
                 // [3] link transit time
 				// [4] num trains
-                //if (slave_id == 3) { //TODO: Remove this. This is put in place to denoise the console (to only have 3 slave threads)
-                //    break;
-                //}
                 int link_information[5] = {row_id, col_id, links_status[row_id][col_id], link_transit_time[row_id][col_id], num_trains};
                 MPI_Send(link_information, 5, MPI_INT, slave_id, 1, MPI_COMM_WORLD);
                 // fprintf(stderr, "+++ MASTER: Sent link information[%d, %d] to slave: %d\n", row_id, col_id, slave_id);
@@ -484,7 +480,7 @@ void master_distribute(int S, int **links_status, struct train_type trains[], in
     }
 	// Send over the list of trains to the slaves
     fprintf(stderr, "+++ MASTER: Sending all %d trains to the slaves.\n", num_trains);
-    num_links = slave_id;		// note(lowjiansheng): The number of links is the same as the number of slaves.
+    num_links = slave_id;
     slave_id = 0;
 	// Send to slave thread an array containing information about the link. 
 	// [0] current station of the train
@@ -495,34 +491,24 @@ void master_distribute(int S, int **links_status, struct train_type trains[], in
 	// [5] status of the train
 	// [6] global index of the train
     for (i = 0 ; i < num_trains; i++) {
-	    //fprintf(stderr, "Doing train %d...\n", i);
         int current_station;
 		int next_station;
-       // fprintf(stderr, "Train status = %d\n", trains[i].status);
-       // fprintf(stderr, "NOT IN NETWORK : %d\n", NOT_IN_NETWORK);
-       // fprintf(stderr, "TRAIN LINE = %d\n", trains[i].line);
 		if (trains[i].status == NOT_IN_NETWORK) {
-          //  fprintf(stderr, "Train %d nin\n", trains[i].status);
             current_station = -1;
             next_station = -1;
         }
         else if (trains[i].line == GREEN){
-        //    fprintf(stderr, "TEST. %d\n", trains[i].station);
 			current_station = get_all_station_index(S, trains[i].station, G,  all_stations_list);
-		//	fprintf(stderr, "GETS HERE?\n");
-        //    fprintf(stderr, "Next station = %d\n", get_next_station(trains[i].station, trains[i].direction, S));
-            next_station = get_all_station_index(S, get_next_station(trains[i].station, trains[i].direction, S), G, all_stations_list);
-        //    fprintf(stderr, "DOES NOT GET HERE.\n");
+            next_station = get_all_station_index(S, get_next_station(trains[i].station, trains[i].direction, num_green_stations), G, all_stations_list);
 		}
 		else if (trains[i].line == BLUE) {
 			current_station = get_all_station_index(S, trains[i].station, B,  all_stations_list);
-			next_station = get_all_station_index(S, get_next_station(trains[i].station, trains[i].direction, S), B, all_stations_list);	
+			next_station = get_all_station_index(S, get_next_station(trains[i].station, trains[i].direction, num_blue_stations), B, all_stations_list);	
 		}
 		else {
 			current_station = get_all_station_index(S, trains[i].station, Y,  all_stations_list);
-			next_station = get_all_station_index(S, get_next_station(trains[i].station, trains[i].direction, S), Y, all_stations_list);	
+			next_station = get_all_station_index(S, get_next_station(trains[i].station, trains[i].direction, num_yellow_stations), Y, all_stations_list);	
 		}
-        //fprintf(stderr, "Doesn't come here\n");
         int train_status[7] = { current_station, next_station, trains[i].line, trains[i].loading_time, trains[i].transit_time, trains[i].status, i};
         for (slave_id = 0; slave_id < num_links; slave_id++) {
             MPI_Send(train_status, 7, MPI_INT, slave_id, i, MPI_COMM_WORLD);
@@ -579,26 +565,22 @@ void master_receive_result(int S, int station_status[], int **link_status, int *
                 num_stations = num_yellow_stations;
                 line_stations = yellow_stations;
             }
-            next_station = get_next_station(prev_station, trains[train_index].direction, num_stations);
 
+            next_station = get_next_station(prev_station, trains[train_index].direction, num_stations);
+            fprintf(stderr, "\nFrom local: %d ---> To Local: %d", prev_station, next_station);
             // Update the direction of the train (For trains reaching a terminal station)
-            if (prev_station < next_station) {
-                next_direction = RIGHT;
-            } else {
+            next_direction = trains[train_index].direction;
+            // Change train direction for reaching terminals.
+            if (next_station == num_stations - 1) {
                 next_direction = LEFT;
+            } else if (next_station == 0) {
+                next_direction = RIGHT;
             }
             line_stations[next_direction][next_station] = train_index;
             trains[train_index].transit_time = 0;
             trains[train_index].station = next_station;
             trains[train_index].status = IN_STATION;
             trains[train_index].loading_time = WAITING_TO_LOAD;
-
-            next_station = get_next_station(next_station, trains[train_index].direction, num_stations);
-            if (prev_station < next_station) {
-                next_direction = RIGHT;
-            } else {
-                next_direction = LEFT;
-            }
             trains[train_index].direction = next_direction;
         } 
         // Case 3: Train just got onto the link
@@ -618,9 +600,6 @@ void master_receive_result(int S, int station_status[], int **link_status, int *
             }
             int current_all_station_index = get_all_station_index(S, current_station, line_stations_names, all_stations_list);
             int current_direction = trains[train_index].direction;
-            // Leave the station update
-            // station_status[current_all_station_index] = READY_TO_LOAD;
-            // line_stations[current_direction][current_station] = READY_TO_LOAD;
             trains[train_index].status = train_status;
             trains[train_index].transit_time = train_transit_time;
         }
@@ -967,7 +946,7 @@ void master() {
             srand((unsigned) time(&t));
             if (station_status[i] == LOADING) {
                 // note(Marx): Should expect that station 7 is here in first few iterations. but it is not
-                // fprintf(stderr, "Iteration %d. Station %d is loading\n", time_tick, i);
+                // fprintf(stderr, "\nIteration %d. Station %d is loading\n", time_tick, i);
             }
             if (station_status[i] == READY_TO_LOAD) {
                 for (j = 0 ; j < num_all_trains; j++) {
@@ -976,14 +955,15 @@ void master() {
                     }
                     int all_stations_index;
                     if (trains[j].line == GREEN) {
-                        all_stations_index = get_all_station_index(num_all_trains, trains[j].station, G, all_stations_list);
+                        all_stations_index = get_all_station_index(S, trains[j].station, G, all_stations_list);
                     }   
                     else if (trains[j].line == BLUE) {
-                        all_stations_index = get_all_station_index(num_all_trains, trains[j].station, B, all_stations_list);
+                        all_stations_index = get_all_station_index(S, trains[j].station, B, all_stations_list);
                     }
                     else {
-                        all_stations_index = get_all_station_index(num_all_trains, trains[j].station, Y, all_stations_list);
+                        all_stations_index = get_all_station_index(S, trains[j].station, Y, all_stations_list);
                     }
+                    // fprintf(stderr, "\n[Step 3] Debug here: Train status: %d, train international station: %d. Train station: %d, trian line: %d", trains[j].status, all_stations_index, trains[j].station, trains[j].line);
                     // Put all trains that are waiting to load in the station to a buffer. Trains in this buffer will be randomly chosen
                     if (all_stations_index == i && trains[j].status == IN_STATION && trains[j].loading_time == WAITING_TO_LOAD){
                         station_trains_buffer[buffer_index] = j;
@@ -994,7 +974,6 @@ void master() {
                 if (buffer_index > 0) {
                     int random_buffer_index = rand() % buffer_index;
                     int random_train_index = station_trains_buffer[random_buffer_index];
-                    // fprintf(stderr, " Setting station %d to be loading\n", i);
                     station_status[i] = LOADING;
                     trains[random_train_index].loading_time = calculate_loadtime(all_stations_popularity_list[i]);
                     if (trains[random_train_index].line == GREEN) {
@@ -1054,18 +1033,18 @@ void master() {
             int num_line_stations;
             if (trains[i].line == GREEN) {
                 line_stations = green_stations;
-                num_line_stations = g;
-                all_stations_index = get_all_station_index(num_all_trains, trains[i].station, G, all_stations_list);
+                num_line_stations = num_green_stations;
+                all_stations_index = get_all_station_index(S, trains[i].station, G, all_stations_list);
             }   
             else if (trains[i].line == BLUE) {
                 line_stations = blue_stations;
-                num_line_stations = b;
-                all_stations_index = get_all_station_index(num_all_trains, trains[i].station, B, all_stations_list);
+                num_line_stations = num_blue_stations;
+                all_stations_index = get_all_station_index(S, trains[i].station, B, all_stations_list);
             }
             else {
                 line_stations = yellow_stations;
-                num_line_stations = y;
-                all_stations_index = get_all_station_index(num_all_trains, trains[i].station, Y, all_stations_list);
+                num_line_stations = num_yellow_stations;
+                all_stations_index = get_all_station_index(S, trains[i].station, Y, all_stations_list);
             }
             // note(Marx): This is an intense debugging session that I spent too much time on
             // if (i == 0) {
@@ -1074,20 +1053,19 @@ void master() {
             //     int temp_transit_time = train.transit_time;
             //     int temp_local_station = train.station;
             //     int temp_direction = train.direction;
-            //     int temp_next_station = get_next_station(temp_local_station, temp_direction, g);
+            //     int temp_next_station = get_next_station(temp_local_station, temp_direction, num_line_stations);
+            //     // fprintf(stderr, "Next station index here: %d | Local station: %d | num stations: %d\n", temp_next_station, temp_local_station, g);
             //     int temp_international_station = get_all_station_index(num_all_trains, trains[i].station, G, all_stations_list);
             //     int temp_next_international_station = get_all_station_index(num_all_trains, temp_next_station, G, all_stations_list);
-            //     fprintf(stderr, "\n\nIntense debug: Train[%d] | transit time: %d | Loading time: %d | local station: %d (int[%d]) | next station: %d (int [%d])\n\n", 
+            //     fprintf(stderr, "\n\nIntense debug: Train[%d] | transit time: %d | Loading time: %d | local station: %d | next station: %d | direction: %d\n\n", 
             //         i,
             //         temp_transit_time,
             //         temp_loading_time,
             //         temp_local_station,
-            //         temp_international_station,
             //         temp_next_station,
-            //         temp_next_international_station
+            //         temp_direction
             //     );
             // }
-            // fprintf(stderr, "~~~~~ Train %d | transittime = %d | loadingtime %d | local station: %d | status: %d | direction: %d~~~~~\n", i, trains[i].transit_time, trains[i].loading_time, trains[i].station, trains[i].status, trains[i].direction);
             if (trains[i].loading_time > FINISHED_LOADING) {
                 trains[i].loading_time--;
                 if (trains[i].loading_time == FINISHED_LOADING){
