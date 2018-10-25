@@ -14,5 +14,5 @@ ubin,changi,tampines,clementi,downtown,chinatown,harborfront,bedok,tuas,johor
 ubin,tuas,harborfront,chinatown,clementi,tampines,changi,clementi,johor
 bedok,chinatown,clementi,tampines,harborfront,changi,ubin
 changi,tampines,downtown,harborfront,bedok,downtown,clementi,ubin
-100
+500
 10,10,10

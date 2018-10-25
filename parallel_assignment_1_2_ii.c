@@ -240,7 +240,6 @@ double get_average_waiting_time(int num_stations, int **station_waiting_times, i
 void get_longest_shortest_average_waiting_time(int num_stations, int **station_waiting_times, int N, double *longest_average_waiting_time, double *shortest_average_waiting_time) {
     int i;
     int j;
-    fprintf(stderr, "Num stations: %d\n", num_stations);
     for (i = 0; i < 2; i++) {
         for (j = 0; j < num_stations; j++) {
             // Skip LEFT ending terminal
@@ -251,7 +250,6 @@ void get_longest_shortest_average_waiting_time(int num_stations, int **station_w
             if (i == 0 && j == 0) {
                 continue;
             }
-            fprintf(stderr, "Station[%d,%d] waiting time: %d\n", i, j, station_waiting_times[i][j]);
             double waiting_time = (double)station_waiting_times[i][j];
             double station_average_waiting_time = waiting_time / (double)N;
             // Update waiting times
@@ -285,7 +283,6 @@ int** slave_receive_data(int link_information_buffer[], int **trains_information
 	// Receiving information regarding the status of the link.
 	MPI_Recv(link_information_buffer, 5, MPI_INT, MASTER_ID, 1, MPI_COMM_WORLD, &status);
     num_trains = link_information_buffer[4];
-    // fprintf(stderr, "--- Slave %d received link information. Num trains: %d\n", myid, num_trains);
     trains_information_buffer = (int **)malloc(num_trains * sizeof(int*));
     // TODO: The code is not getting past the below for loop.
     // This is because of how trains_information_buffer is initialized.
@@ -302,21 +299,9 @@ int** slave_receive_data(int link_information_buffer[], int **trains_information
 	// [5] status of the train
 	// [6] global index of the train
 	for (i = 0 ; i < num_trains; i++) {
-    //    fprintf(stderr, "Trying to receive train information slave : %d\n", myid);
         MPI_Recv(trains_information_buffer[i], 7, MPI_INT, MASTER_ID, i, MPI_COMM_WORLD, &status);
 	}
     return trains_information_buffer;
-    // CONFIRMING RESULTS.
-    /*
-    for (i = 0 ; i < num_trains; i++){
-        fprintf(stderr, "%d %d %d %d %d %d %d\n", trains_information_buffer[i][0],
-                                                    trains_information_buffer[i][1],
-                                                    trains_information_buffer[i][2],
-                                                    trains_information_buffer[i][3],
-                                                    trains_information_buffer[i][4],
-                                                    trains_information_buffer[i][5],
-                                                    trains_information_buffer[i][6]);
-    }*/
 }
 
 /** 
@@ -415,7 +400,6 @@ void slave_send_result(int link_information_buffer[], int train_to_return[], int
     MPI_Send(train_to_return, train_to_return_size, MPI_INT, MASTER_ID, TRAIN_INFORMATION_TAG, MPI_COMM_WORLD);
     // Send the Link info
     MPI_Send(link_information_buffer, link_info_size, MPI_INT, MASTER_ID, LINK_INFORMATION_TAG, MPI_COMM_WORLD);
-    // fprintf(stderr, "Slave %d finished sending results back to master.\n",myid);
 }
 
 /**
@@ -434,7 +418,6 @@ void slave() {
     int time_tick = 0;
 	// Receive data
     while (1){
-        // fprintf(stderr, "Slave %d is at timetick = %d.\n", myid, time_tick);
         trains_information_buffer = slave_receive_data(link_information_buffer, trains_information_buffer);
         // Doing the computations
         slave_compute(link_information_buffer, trains_information_buffer, train_to_return);
@@ -458,7 +441,7 @@ void master_distribute(int S, int **links_status, struct train_type trains[], in
 	int slave_id = 0;
 	int num_links;
 	// Send link statuses to the slaves
-    fprintf(stderr, "+++ Master: Now sending link informations to slaves.\n");
+    // fprintf(stderr, "+++ Master: Now sending link informations to slaves.\n");
     int temp_count = 0;
 
     for (row_id = 0; row_id < S; row_id++) {
@@ -479,7 +462,7 @@ void master_distribute(int S, int **links_status, struct train_type trains[], in
         }
     }
 	// Send over the list of trains to the slaves
-    fprintf(stderr, "+++ MASTER: Sending all %d trains to the slaves.\n", num_trains);
+    // fprintf(stderr, "+++ MASTER: Sending all %d trains to the slaves.\n", num_trains);
     num_links = slave_id;
     slave_id = 0;
 	// Send to slave thread an array containing information about the link. 
@@ -522,7 +505,7 @@ void master_distribute(int S, int **links_status, struct train_type trains[], in
 void master_receive_result(int S, int station_status[], int **link_status, int **link_transit_time, struct train_type trains[], char *G[], char *Y[], char *B[], char *all_stations_list[], int **green_stations, int **yellow_stations, int **blue_stations) {
 	MPI_Status status;
 	// Master waits for an array describing the train link status and an array of the train that has been modified.
-    fprintf(stderr, "+++ MASTER : Now receiving results back from the slaves\n");
+    // fprintf(stderr, "+++ MASTER : Now receiving results back from the slaves\n");
 	int i, j;
 	int slave_id = 0;
 	int link_information_buffer[5];
@@ -567,7 +550,7 @@ void master_receive_result(int S, int station_status[], int **link_status, int *
             }
 
             next_station = get_next_station(prev_station, trains[train_index].direction, num_stations);
-            fprintf(stderr, "\nFrom local: %d ---> To Local: %d", prev_station, next_station);
+            // fprintf(stderr, "\nFrom local: %d ---> To Local: %d", prev_station, next_station);
             // Update the direction of the train (For trains reaching a terminal station)
             next_direction = trains[train_index].direction;
             // Change train direction for reaching terminals.
@@ -935,7 +918,7 @@ void master() {
         }
 		
 		// STEP 2: ---------------------------- PARALLEL (Update Links) ----------------------------
-        fprintf(stderr, " ~~~~~~~~~~~~~~~~~~~~~~~~ Time tick: %d | Master distributing parallel code\n", time_tick);
+        // fprintf(stderr, " ~~~~~~~~~~~~~~~~~~~~~~~~ Time tick: %d | Master distributing parallel code\n", time_tick);
 		master_distribute(S, links_status, trains, num_all_trains, link_transit_time, G, Y, B, all_stations_list);
 		master_receive_result(S, station_status, links_status, link_transit_time, trains, G, Y, B, all_stations_list, green_stations, yellow_stations, blue_stations);
         // STEP 3: ---------------------------- MASTER (Load trains into empty stations) ----------------------------
@@ -1076,12 +1059,12 @@ void master() {
             // The update to move trains from transit into station --> ALREADY DONE AT SLAVE
         }
         print_output(time_tick, trains, num_all_trains, G, Y, B, g, y, b, all_stations_list, S, num_green_stations, num_yellow_stations, num_blue_stations, fp);
-        fprintf(stderr, "\n\n");
+        // fprintf(stderr, "\n\n");
 	}
     // Close clock for time
     clock_t difference = clock() - before;
     msec = difference * 1000 / CLOCKS_PER_SEC;
-    printf("Time taken: %d seconds %d milliseconds\n", msec/1000, msec%1000);
+    printf("\nTime taken: %d seconds %d milliseconds\n", msec/1000, msec%1000);
 
     // Get waiting time
     double green_longest_average_waiting_time = 0;
